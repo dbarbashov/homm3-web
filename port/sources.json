@@ -37,7 +37,8 @@
     "sdl_backend",
     "cursor",
     "menu_media",
-    "hd_view"
+    "hd_view",
+    "lod_cache"
   ],
   "frontend": [
     "bridge",

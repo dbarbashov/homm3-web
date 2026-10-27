@@ -41,6 +41,14 @@ only the requested video from each archive, without uploading the installation.
 Original fonts, maps, artwork, music,
 executables and archives must not be added to pull requests.
 
+Graphics archives are loaded before play. Music and movies load on demand.
+The renderer uploads only changed screen regions; a 16 MiB bounded cache avoids
+repeated archive decompression. Browser decompression yields between short slices.
+For a repeatable local performance trace, run `npm start`, then
+`RUN=current CPU=4 python3 scripts/performance-browser-probe.py` with no other
+browser tests running. Python Playwright with Chromium is required. `CPU=4` is
+an artificial stress test, not an estimate of any particular player's hardware.
+
 ## Build and run locally
 
 Tested on macOS ARM64. Install Git, Python 3, Node.js 22+, CMake 3.20+, Clang,

@@ -150,7 +150,8 @@
     "network",
     "hd_qol",
     "hd_view",
-    "video"
+    "video",
+    "lod_cache"
   ],
   "frontend": [
     "bridge"

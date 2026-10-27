@@ -57,7 +57,8 @@ static SDL_Window* window=nullptr;
 static SDL_Renderer* renderer=nullptr;
 static SDL_Texture* texture=nullptr;
 static bool quit=false;
-static Bitmap16Bit frontBuffer(800,600), displayBuffer(800,600);
+static Bitmap16Bit frontBuffer(800,600), displayBuffer(800,600), uploadedBuffer(800,600);
+static bool textureInvalid=true;
 static int menuSuppression=0;
 namespace {
 struct Overlay {
@@ -146,6 +147,7 @@ void resizeDisplay(int w,int h){
     if(g_windowManager && g_windowManager->m_screenBitmap)
         g_windowManager->m_screenBitmap->reference(w,h,g_initWin.GetPitch(),g_initWin.GetMap(0,0));
     frontBuffer.import(w,h,blank.data(),0);displayBuffer.import(w,h,blank.data(),0);
+    uploadedBuffer.import(w,h,blank.data(),0);textureInvalid=true;
     SDL_DestroyTexture(texture);
     texture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB565,SDL_TEXTUREACCESS_STREAMING,w,h);
 #ifdef __EMSCRIPTEN__
@@ -171,6 +173,7 @@ bool openDisplay(){
     if(!renderer)return false;
     SDL_RenderSetLogicalSize(renderer,800,600);
     texture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB565,SDL_TEXTUREACCESS_STREAMING,800,600);
+    textureInvalid=true;
     return texture!=nullptr;
 }
 bool setFullscreen(bool enabled){return window && SDL_SetWindowFullscreen(window,enabled?SDL_WINDOW_FULLSCREEN_DESKTOP:0)==0;}
@@ -193,7 +196,31 @@ void present(){
     if(!texture || closingOverlay)return;
     composeFrame(frontBuffer,displayBuffer);
     drawCursor(displayBuffer,HD::overlayOffsetX(),HD::overlayOffsetY());
-    SDL_UpdateTexture(texture,nullptr,displayBuffer.GetMap(0,0),displayBuffer.GetPitch());
+    // SDL's WebGL renderer converts RGB565 to RGBA on the CPU. Restrict that
+    // conversion/upload to changed pixels, including both old and new cursor
+    // positions. Comparing the final composition also handles nested overlays.
+    const int w=displayBuffer.GetWidth(),h=displayBuffer.GetHeight();
+    int left=w,top=h,right=0,bottom=0;
+    if(textureInvalid){left=top=0;right=w;bottom=h;}
+    else for(int y=0;y<h;++y){
+        const auto* row=displayBuffer.GetMap(0,y);
+        const auto* previous=uploadedBuffer.GetMap(0,y);
+        if(std::memcmp(row,previous,w*sizeof(*row))==0)continue;
+        int first=0,last=w;
+        while(first<last && row[first]==previous[first])++first;
+        while(last>first && row[last-1]==previous[last-1])--last;
+        left=std::min(left,first);right=std::max(right,last);
+        top=std::min(top,y);bottom=y+1;
+    }
+    if(right>left && bottom>top){
+        SDL_Rect rect{left,top,right-left,bottom-top};
+        if(SDL_UpdateTexture(texture,&rect,displayBuffer.GetMap(left,top),displayBuffer.GetPitch())==0){
+            displayBuffer.Draw(left,top,rect.w,rect.h,&uploadedBuffer,left,top,false);
+            textureInvalid=false;
+        }
+    }
+    // The browser may discard its drawing buffer after compositing. Redraw the
+    // retained texture even when no CPU conversion or texture upload is needed.
     SDL_RenderClear(renderer);SDL_RenderCopy(renderer,texture,nullptr,nullptr);SDL_RenderPresent(renderer);
 }
 const Bitmap16Bit& committedFrame(){return frontBuffer;}
