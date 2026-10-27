@@ -5,6 +5,7 @@
 #include "resourcemanager.h"
 #include "port_cursor_tables.h"
 #include <SDL.h>
+#include <tuple>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -21,6 +22,15 @@ bool pointerIsInside(){
 }
 namespace Port {
 void cursorInside(bool value){inside=value;if(g_mouseManager)g_mouseManager->showSystemCursor(!value);}
+bool cursorNeedsRedraw(int offsetX,int offsetY){
+    using State=std::tuple<const void*,int,int,int,int,int,int,bool>;
+    static State previous{};
+    auto* m=g_mouseManager;
+    const bool visible=pointerIsInside() && m && m->m_status==1 && m->isVis() && m->m_sprite && m->m_frame>=0;
+    State current{m?m->m_sprite:nullptr,m?m->m_currentX:0,m?m->m_currentY:0,
+                  m?int(m->m_set):0,m?m->m_frame:0,offsetX,offsetY,visible};
+    const bool changed=current!=previous;previous=current;return changed;
+}
 void drawCursor(Bitmap16Bit& target,int offsetX,int offsetY){
     auto* m=g_mouseManager;
     const bool visible=pointerIsInside() && m && m->m_status==1 && m->isVis() && m->m_sprite && m->m_frame>=0;

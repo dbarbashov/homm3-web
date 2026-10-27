@@ -59,6 +59,7 @@ static SDL_Texture* texture=nullptr;
 static bool quit=false;
 static Bitmap16Bit frontBuffer(800,600), displayBuffer(800,600), uploadedBuffer(800,600);
 static bool textureInvalid=true;
+static bool frameDirty=true;
 static int menuSuppression=0;
 namespace {
 struct Overlay {
@@ -100,6 +101,7 @@ bool hasAdventureBackdrop(){return adventureWindow!=nullptr;}
 int overlayOffsetX(){return (!adventureWindow || !overlays.empty())?(g_initWin.GetWidth()-800)/2:0;}
 int overlayOffsetY(){return (!adventureWindow || !overlays.empty())?(g_initWin.GetHeight()-600)/2:0;}
 void windowOpening(heroWindow* win,bool adventure){
+    frameDirty=true;
     if(adventure){
         const int oldX=overlayOffsetX(),oldY=overlayOffsetY();
         overlays.clear();adventureWindow=win;
@@ -124,6 +126,7 @@ void windowClosing(heroWindow* win){
     closingOverlay=win==adventureWindow || (!overlays.empty() && overlays.back().window==win);
 }
 void windowClosed(heroWindow* win){
+    frameDirty=true;
     const int oldX=overlayOffsetX(),oldY=overlayOffsetY();
     for(auto it=overlays.begin();it!=overlays.end();++it){
         if(it->window!=win)continue;
@@ -184,6 +187,7 @@ void commitFrame(int x,int y,int width,int height){
     x=std::max(0,x);y=std::max(0,y);
     if(right<=x || bottom<=y)return;
     g_initWin.Draw(x,y,right-x,bottom-y,&frontBuffer,x,y,false);
+    frameDirty=true;
     if(!overlays.empty() && !closingOverlay){
         auto& layer=overlays.back();
         // An idle pump during widget construction must keep the old scene.
@@ -194,29 +198,34 @@ void commitFrame(int x,int y,int width,int height){
 }
 void present(){
     if(!texture || closingOverlay)return;
-    composeFrame(frontBuffer,displayBuffer);
-    drawCursor(displayBuffer,HD::overlayOffsetX(),HD::overlayOffsetY());
-    // SDL's WebGL renderer converts RGB565 to RGBA on the CPU. Restrict that
-    // conversion/upload to changed pixels, including both old and new cursor
-    // positions. Comparing the final composition also handles nested overlays.
-    const int w=displayBuffer.GetWidth(),h=displayBuffer.GetHeight();
-    int left=w,top=h,right=0,bottom=0;
-    if(textureInvalid){left=top=0;right=w;bottom=h;}
-    else for(int y=0;y<h;++y){
-        const auto* row=displayBuffer.GetMap(0,y);
-        const auto* previous=uploadedBuffer.GetMap(0,y);
-        if(std::memcmp(row,previous,w*sizeof(*row))==0)continue;
-        int first=0,last=w;
-        while(first<last && row[first]==previous[first])++first;
-        while(last>first && row[last-1]==previous[last-1])--last;
-        left=std::min(left,first);right=std::max(right,last);
-        top=std::min(top,y);bottom=y+1;
-    }
-    if(right>left && bottom>top){
-        SDL_Rect rect{left,top,right-left,bottom-top};
-        if(SDL_UpdateTexture(texture,&rect,displayBuffer.GetMap(left,top),displayBuffer.GetPitch())==0){
-            displayBuffer.Draw(left,top,rect.w,rect.h,&uploadedBuffer,left,top,false);
-            textureInvalid=false;
+    const int offsetX=HD::overlayOffsetX(),offsetY=HD::overlayOffsetY();
+    const bool pointerChanged=cursorNeedsRedraw(offsetX,offsetY);
+    if(frameDirty || textureInvalid || pointerChanged){
+        frameDirty=false;
+        composeFrame(frontBuffer,displayBuffer);
+        drawCursor(displayBuffer,offsetX,offsetY);
+        // SDL's WebGL renderer converts RGB565 to RGBA on the CPU. Restrict that
+        // conversion/upload to changed pixels, including both old and new cursor
+        // positions. Comparing the final composition also handles nested overlays.
+        const int w=displayBuffer.GetWidth(),h=displayBuffer.GetHeight();
+        int left=w,top=h,right=0,bottom=0;
+        if(textureInvalid){left=top=0;right=w;bottom=h;}
+        else for(int y=0;y<h;++y){
+            const auto* row=displayBuffer.GetMap(0,y);
+            const auto* previous=uploadedBuffer.GetMap(0,y);
+            if(std::memcmp(row,previous,w*sizeof(*row))==0)continue;
+            int first=0,last=w;
+            while(first<last && row[first]==previous[first])++first;
+            while(last>first && row[last-1]==previous[last-1])--last;
+            left=std::min(left,first);right=std::max(right,last);
+            top=std::min(top,y);bottom=y+1;
+        }
+        if(right>left && bottom>top){
+            SDL_Rect rect{left,top,right-left,bottom-top};
+            if(SDL_UpdateTexture(texture,&rect,displayBuffer.GetMap(left,top),displayBuffer.GetPitch())==0){
+                displayBuffer.Draw(left,top,rect.w,rect.h,&uploadedBuffer,left,top,false);
+                textureInvalid=false;
+            }else frameDirty=true;
         }
     }
     // The browser may discard its drawing buffer after compositing. Redraw the

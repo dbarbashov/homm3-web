@@ -9,7 +9,7 @@ subprocess.run(['clang++','-std=c++14','-DHOMM3_PORT','-DHOMM3_FULL_GAME','-incl
 
 import tempfile,json
 with tempfile.TemporaryDirectory(prefix='homm3-prefs-') as directory:
-    for action in ['write','read']:
+    for action in ['defaults','write','read','write-slow','read-slow']:
         subprocess.run([str(ROOT/'build/preferences-probe'),directory,action],check=True,timeout=15)
     (Path(directory)/'preferences.dat').write_text('H3PREF1\ninvalid record\n')
     subprocess.run([str(ROOT/'build/preferences-probe'),directory,'defaults'],check=True,timeout=15)

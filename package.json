@@ -1,6 +1,6 @@
 {
   "name": "homm3-web",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,7 +22,8 @@
     "test:mobile": "python3 scripts/mobile-browser-smoke.py && BROWSER=chromium python3 scripts/mobile-browser-smoke.py",
     "test:ai": "python3 scripts/test-ai-recruitment.py && TEST_MAP=\"Peaceful Ending.h3m\" python3 scripts/network-ai-smoke.py",
     "test:hd": "python3 scripts/test-hd-qol.py && python3 scripts/test-hd-view.py && python3 scripts/hd-browser-smoke.py",
-    "test:overlays": "python3 scripts/test-hd-view.py && python3 scripts/overlay-browser-smoke.py && BROWSER=webkit python3 scripts/overlay-browser-smoke.py"
+    "test:overlays": "python3 scripts/test-hd-view.py && python3 scripts/overlay-browser-smoke.py && BROWSER=webkit python3 scripts/overlay-browser-smoke.py",
+    "test:combat-performance": "python3 scripts/combat-performance-probe.py"
   },
   "description": "Heroes III C++ / WebAssembly client with an adaptive browser interface",
   "license": "MIT"

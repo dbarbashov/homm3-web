@@ -1018,6 +1018,38 @@
      }
      return bestValue;
  }
+--- a/src/army.cpp
++++ b/src/army.cpp
+@@ -1,4 +1,5 @@
+ #include "va.h"
++#include "performance_trace.h"
+ #include "includes.h"
+ 
+ #include <algorithm>
+@@ -1128,7 +1129,9 @@
+ void army::rangeAttack(army* armyToAttack)
+ {
+     checkLuck();
++    Port::traceCombat("shot-start", group, index);
+     animateMissile(armyToAttack);
++    Port::traceCombat("shot-impact", group, index);
+     if (!getOwner()
+         || !getOwner()->isWieldingArtifact(ARTIFACT_AMMO_CART))
+         m_monInfo.numShots--;
+@@ -1260,8 +1263,11 @@
+                                         armyToAttack, killed);
+         if (g_combatManager->isQuickCombat())
+             return;
+-        waitSample(SHOOT_SAMPLE);
+-    }
++        Port::traceCombat("shot-animation-end", group, index);
++        // The host audio backend owns its PCM until playback finishes. Do not
++        // hold the next turn for the tail of a shot after its impact is visible.
++    }
++    Port::traceCombat("shot-end", group, index);
+ }
+ 
+ // One stack's whole shooting turn: resolve the target it was told to
 --- a/src/armygrp.cpp
 +++ b/src/armygrp.cpp
 @@ -155,7 +155,7 @@
@@ -2261,6 +2293,15 @@
  #include "va.h"
  
  #include <stdarg.h>
+@@ -359,7 +360,7 @@
+     g_config.m_showCombatMouseHex = 0;
+     g_config.m_combatShadeLevel = 0;
+     g_config.m_combatArmyInfoLevel = 0;
+-    g_config.m_combatSpeed = 0;
++    g_config.m_combatSpeed = 2;  // Fast animation default; saved preferences still win.
+     g_config.m_combatAutoCreatures = 1;
+     g_config.m_combatAutoSpells = 1;
+     g_config.m_combatCatapult = 1;
 @@ -504,7 +505,7 @@
              static_cast<BYTE*>(static_cast<void*>(
                  g_config.cUniqueSystemID)), &cbData);

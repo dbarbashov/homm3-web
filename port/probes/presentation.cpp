@@ -40,6 +40,17 @@ int main(int argc,char** argv){
             for(int edge: {0,799}){g_mouseManager->m_currentX=edge;g_mouseManager->m_currentY=edge?599:0;Port::drawCursor(image);}
             g_mouseManager->m_currentX=400;g_mouseManager->m_currentY=300;
         }
+        // A retained texture must still repaint cursor moves, hides and frames.
+        for(int step=0;step<4;++step){
+            if(step==1)g_mouseManager->m_currentX+=37;
+            if(step==2)g_mouseManager->hidePointer();
+            if(step==3){g_mouseManager->showPointer(true);g_mouseManager->setPointer(1,mouseManager::SPELL_SET);}
+            Port::present();
+            Port::committedFrame().Draw(0,0,800,600,&image,0,0,false);
+            Port::drawCursor(image);
+            for(int y=0;y<600;++y)
+                require(!std::memcmp(image.GetMap(0,y),Port::presentedFrame().GetMap(0,y),800*2),"retained frame left a stale cursor");
+        }
         g_mouseManager->setPointer(0,mouseManager::SPELL_SET);SDL_Delay(110);g_mouseManager->checkUpdate();
         require(g_mouseManager->getFrame()==1,"animated spell cursor");
         g_mouseManager->hidePointer();g_initWin.Draw(0,0,800,600,&image,0,0,false);Port::drawCursor(image);
