@@ -1,0 +1,29 @@
+{
+  "name": "homm3-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "python3 scripts/build.py",
+    "start": "node scripts/start-site.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build:port": "python3 scripts/build-port.py && python3 scripts/build-port.py --target web",
+    "start:native": "python3 scripts/run-port.py",
+    "test:port": "python3 scripts/test-port.py && python3 scripts/port-browser-smoke.py",
+    "build:game": "python3 scripts/build-game.py && python3 scripts/build-game.py --target web",
+    "start:game": "python3 scripts/run-game.py",
+    "test:game": "python3 scripts/game-browser-smoke.py",
+    "test:media": "python3 scripts/test-presentation.py && python3 scripts/media-browser-smoke.py",
+    "test:sound": "python3 scripts/test-sound.py && python3 scripts/sfx-browser-smoke.py",
+    "test:preferences": "python3 scripts/test-preferences.py && python3 scripts/preferences-browser-smoke.py",
+    "start:assets": "node server.mjs",
+    "test:network": "python3 scripts/network-browser-smoke.py",
+    "test:site": "python3 scripts/site-browser-smoke.py && python3 scripts/local-assets-browser-smoke.py",
+    "test:mobile": "python3 scripts/mobile-browser-smoke.py && BROWSER=chromium python3 scripts/mobile-browser-smoke.py",
+    "test:ai": "python3 scripts/test-ai-recruitment.py && TEST_MAP=\"Peaceful Ending.h3m\" python3 scripts/network-ai-smoke.py",
+    "test:hd": "python3 scripts/test-hd-qol.py && python3 scripts/test-hd-view.py && python3 scripts/hd-browser-smoke.py",
+    "test:overlays": "python3 scripts/test-hd-view.py && python3 scripts/overlay-browser-smoke.py && BROWSER=webkit python3 scripts/overlay-browser-smoke.py"
+  },
+  "description": "Heroes III C++ / WebAssembly client with an adaptive browser interface",
+  "license": "MIT"
+}

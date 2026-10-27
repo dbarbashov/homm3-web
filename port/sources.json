@@ -1,0 +1,46 @@
+{
+  "core": [
+    "lodfile",
+    "resource",
+    "resourcemanager",
+    "palette",
+    "csprite",
+    "cspriteframe",
+    "csequence",
+    "bitmap16",
+    "bitmap816",
+    "bitmap24",
+    "font",
+    "textresource",
+    "gamecontext",
+    "mainmenu",
+    "window",
+    "widget",
+    "button",
+    "winmgr",
+    "basemgr",
+    "inputmgr",
+    "portable_helpers",
+    "gametypewindow",
+    "dialogbox",
+    "border",
+    "textwdgt",
+    "iconwdgt",
+    "textscroller",
+    "slider",
+    "text"
+  ],
+  "platform": [
+    "files",
+    "pcx",
+    "archive_state",
+    "sdl_backend",
+    "cursor",
+    "menu_media",
+    "hd_view"
+  ],
+  "frontend": [
+    "bridge",
+    "dialogs"
+  ]
+}

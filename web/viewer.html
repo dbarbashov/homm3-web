@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Heroes III · Browser foundation</title><link rel="stylesheet" href="style.css">
+<body>
+<header><div><span class="eyebrow">Heroes of Might and Magic III</span><h1>Возвращение в Эрафию</h1></div><span class="tag">Прототип 0.1 · просмотр карт</span></header>
+<main>
+<aside>
+<label for="maps">Сценарий из твоей установки</label>
+<select id="maps" disabled><option>Читаем установку…</option></select>
+<button id="open" disabled>Открыть карту</button>
+<label for="encoding">Текст карты</label><select id="encoding"><option value="windows-1251">Русский · Windows-1251</option><option value="windows-1252">Западноевропейский · Windows-1252</option></select>
+<div class="separator"></div>
+<canvas id="minimap" width="220" height="220" aria-label="Миникарта: нажмите для перемещения камеры"></canvas>
+<div class="row"><button id="surface" disabled>Поверхность</button><button id="underground" disabled>Подземелье</button></div>
+<div class="row zoom"><button id="minus" aria-label="Уменьшить">−</button><span id="scale">100%</span><button id="plus" aria-label="Увеличить">+</button></div>
+<label class="check"><input type="checkbox" id="objects" checked> Объекты</label>
+<label class="check"><input type="checkbox" id="animation" checked> Анимация</label>
+<label class="check"><input type="checkbox" id="grid"> Сетка</label>
+<button id="music" disabled>Включить музыку</button>
+<div class="separator"></div>
+<div id="cell" class="muted">Нажми на клетку, чтобы увидеть её координаты и тип.</div>
+</aside>
+<section class="world"><div class="map-heading"><div><h2 id="map-name">Оригинальные миры, новый браузерный слой</h2><span id="map-meta" class="muted">H3M + DEF · WebAssembly</span></div><button id="fullscreen" aria-label="Развернуть карту">Развернуть</button></div>
+<div id="viewport"><canvas id="map" tabindex="0" aria-label="Карта приключений. Перетаскивание и стрелки перемещают камеру, колесо меняет масштаб."></canvas><div id="loading" role="status"><span id="loading-text">Загружаем модуль WebAssembly…</span><progress id="progress" max="100" value="0"></progress></div></div>
+<div class="map-footer"><span>Перетаскивай карту · колесо — масштаб · клик — клетка</span><span id="status" role="status">Подключение…</span></div>
+<p id="description"></p><details id="warnings" hidden><summary>Не загруженные ресурсы</summary><pre></pre></details>
+</section>
+</main>
+<footer><span>Это первый этап порта: карты и графика. Ходы, бои, экономика и ИИ ещё не перенесены.</span><a href="status.html">Что уже работает →</a><a href="https://github.com/sushi-shi/homm3-decomp">На основе homm3-decomp ↗</a></footer>
+<script type="module" src="app.js"></script>
+</body></html>

@@ -1,0 +1,8 @@
+{
+  "emscripten": "6.0.13",
+  "emsdkCommit": "d7b4130688bfa348392b921ab04015aa15c4f154",
+  "webSDL2": "2.32.10",
+  "nativeSDL2": "2.32.10",
+  "testedNative": "macOS ARM64 / AppleClang 17",
+  "windows": "not built or tested"
+}
