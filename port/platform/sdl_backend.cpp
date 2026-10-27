@@ -1,5 +1,8 @@
 // Platform boundary: SDL replaces the Windows window, event queue and presentation.
 #include "sdl_backend.h"
+#ifdef HOMM3_FULL_GAME
+#include "smackmgr.h"
+#endif
 #include "cursor.h"
 #include <SDL.h>
 #ifdef __EMSCRIPTEN__
@@ -296,6 +299,7 @@ void process1WindowsMessage(){
             g_game->m_day,g_game->m_week,g_game->m_month,g_playerTurn,h?int(h->m_id):-1,
             h?h->m_x:-1,h?h->m_y:-1,h?h->m_z:-1,h?h->m_movePoints:0,g_currentPlayer->m_resources[6],g_combatActive,g_combatManager?g_combatManager->m_turnNumber:0,g_combatManager?g_combatManager->m_autoCombatOn:0,g_combatManager?g_combatManager->m_nextAction:0,h?h->m_experience:0,g_advManager->m_heroMoving);
         // Keep each EM_ASM within the toolchain's 16 positional argument limit.
+        EM_ASM({window.homm3CampaignState=({active:!!$0,campaign:$1,map:$2,choice:$3,completed:$4});},g_inCampaign,g_game->m_campaign.m_currentCampaign,g_game->m_campaign.m_currentMap,g_game->m_campaign.m_briefingChoice,g_game->m_campaign.m_currentMap>=0 && g_game->m_campaign.m_currentMap<int(g_game->m_campaign.m_mapScores.size())?g_game->m_campaign.getCurrentScenario()->m_completed:0);
         EM_ASM({Object.assign(window.homm3GameState,{localPlayer:$0,remote:$1,humans:$2});},g_localGamePos,g_remoteOn,g_numHumanPlayers);
         EM_ASM({window.homm3NetworkState=({control:$0,currentLocal:$1,visibility:$2,radarX:$3,radarY:$4});},g_thisNetGotAdventureControl,g_currentPlayer->isLocalHuman(),g_mapVisibilityBit,g_advManager->m_radarOrigin.m_x,g_advManager->m_radarOrigin.m_y);
         EM_ASM({Object.assign(window.homm3NetworkState,{turnSlot:$0,aiOwner:$1,map:UTF8ToString($2)});},g_netLocalGamePos,g_game->getLastHuman(),g_game->m_setup.m_filename);
@@ -306,10 +310,16 @@ void process1WindowsMessage(){
         }
     }
 #endif
+#ifdef HOMM3_FULL_GAME
+    videoNextFrame();
+#endif
     static uint32_t lastPresent=0;
     if(SDL_GetTicks()-lastPresent>=16){Port::present();lastPresent=SDL_GetTicks();}
     emscripten_sleep(8); // Original button::main has a nested synchronous message pump.
 #else
+#ifdef HOMM3_FULL_GAME
+    videoNextFrame();
+#endif
     Port::present();
     SDL_Delay(8);
 #endif

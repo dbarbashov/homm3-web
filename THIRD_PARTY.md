@@ -76,3 +76,18 @@ no Microsoft DirectPlay runtime or new independent game rules are linked.
 ## HD-style interface
 
 The expanded adventure viewport and army/recruitment shortcuts are independently implemented in the portable C++ engine, inspired by the documented [Heroes III HD Mod interface](https://sites.google.com/site/heroes3hd/eng/functionality). No HD Mod binaries or code are bundled. Original interface artwork still comes from the user’s game installation.
+
+## Original video decoding
+
+Bink and Smacker video/audio are decoded by [FFmpeg 8.0.3](https://ffmpeg.org/),
+built with GPL and nonfree components disabled, under LGPL 2.1 or later.
+The license is included in `licenses/ffmpeg-LGPL-2.1.txt`. No proprietary codec
+runtime is linked. `scripts/build-video.py` downloads the unmodified source,
+verifies its SHA-256 and records the exact minimal configure command.
+
+To replace or modify FFmpeg, edit its source under `.local/ffmpeg-8.0.3`, remove
+`build/ffmpeg-web/install/version.txt` (or the native equivalent), and rebuild
+with the normal CMake commands in README. All application and linking sources
+are provided; users may modify and relink the client. FFmpeg source archives
+accompany downloadable client releases. Original `.vid`, `.bik` and `.smk`
+assets are supplied separately by the user and are not part of those releases.

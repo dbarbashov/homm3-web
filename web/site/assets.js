@@ -1,6 +1,6 @@
 /* An explicitly selected installation stays in browser memory; never uploaded. */
 (() => {
-  let files = null;
+  let files = null, videoEntries = new Map();
   const nativeFetch = window.fetch.bind(window);
   const required = ['h3bitmap.lod','h3sprite.lod','h3ab_bmp.lod','h3ab_spr.lod'];
   const input = document.querySelector('#game-files');
@@ -15,7 +15,7 @@
       const base = new URL(config.baseUrl);
       if (base.protocol !== 'https:' && !['localhost','127.0.0.1','[::1]'].includes(base.hostname)) throw new Error('Ресурсам требуется HTTPS');
       if (!base.pathname.endsWith('/')) throw new Error('Некорректный адрес ресурсов');
-      return {...config, baseUrl:base.href};
+      return {...config, baseUrl:base.href, fileLookup:new Map(Object.entries(config.files).map(([name,file])=>[name.toLowerCase(),file]))};
     })();
     return remoteConfig;
   }
@@ -24,26 +24,32 @@
       const selected = new Map();
       for (const file of list) {
         const name = file.name.toLowerCase();
-        if (/\.(lod|snd|h3m|mp3)$/i.test(name)) {
+        if (/\.(lod|snd|h3m|h3c|mp3|vid)$/i.test(name)) {
           if (selected.has(name)) throw new Error('Несколько файлов с именем ' + file.name + '. Выберите одну установку.');
           selected.set(name, file);
         }
       }
       for (const name of [...required,'heroes3.snd']) if (!selected.has(name)) throw new Error('В выбранной папке не найден ' + name);
-      if (![...selected.keys()].some(n => n.endsWith('.h3m'))) throw new Error('В выбранной папке нет сценариев H3M');
+      const videos = new Map();
+      const {indexVideoBlob} = await import('/site/video-archive.js');
+      for (const name of ['heroes3.vid','video.vid','h3ab_ahd.vid']) {
+        const archive = selected.get(name); if (!archive) continue;
+        for (const entry of await indexVideoBlob(archive)) videos.set(entry.name.toLowerCase(),{...entry,archive});
+      }
+      videoEntries = videos;
       files = selected;
       window.dispatchEvent(new Event('homm3-assets-selected'));
     },
     async fetch(url, options) {
       const u = new URL(url, location.href);
-      if (!files && u.origin === location.origin && ['/api/catalog','/api/archive','/api/scenario','/api/music'].includes(u.pathname)) {
+      if (!files && u.origin === location.origin && ['/api/catalog','/api/archive','/api/scenario','/api/music','/api/video'].includes(u.pathname)) {
         const config = await remote();
         if (config) {
           if (u.pathname === '/api/catalog') return Response.json({...config.catalog,ready:true,remote:true});
           const name = u.searchParams.get('name') || '';
-          if (!Object.hasOwn(config.files,name)) return new Response('Файл не найден',{status:404});
-          const file = config.files[name];
-          if (!/^[a-f0-9]{64}\.(lod|snd|h3m|mp3)$/.test(file)) throw new Error('Некорректный файл ресурсов');
+          const file = config.fileLookup.get(name.toLowerCase());
+          if (!file) return new Response('Файл не найден',{status:404});
+          if (!/^[a-f0-9]{64}\.(lod|snd|h3m|h3c|mp3|smk|bik)$/.test(file)) throw new Error('Некорректный файл ресурсов');
           // Browser downloads directly from the resource host, never through the game VPS.
           return nativeFetch(new URL(file, config.baseUrl), {...options,mode:'cors',credentials:'omit'});
         }
@@ -53,9 +59,13 @@
         const all = [...files.values()];
         const archives = required.map(n => ({name:files.get(n).name,bytes:files.get(n).size}));
         const soundArchives = all.filter(f => /^(heroes3|h3ab_ahd)\.snd$/i.test(f.name)).map(f => ({name:f.name,bytes:f.size}));
-        return Response.json({ready:true,archives,soundArchives,maps:all.filter(f=>/\.h3m$/i.test(f.name)).map(f=>f.name).sort(),music:all.filter(f=>/\.mp3$/i.test(f.name)).map(f=>f.name),local:true});
+        return Response.json({ready:true,archives,soundArchives,campaigns:all.filter(f=>/\.h3c$/i.test(f.name)).map(f=>f.name),videos:[...videoEntries.keys()],maps:all.filter(f=>/\.h3m$/i.test(f.name)).map(f=>f.name).sort(),music:all.filter(f=>/\.mp3$/i.test(f.name)).map(f=>f.name),local:true});
       }
-      if (['/api/archive','/api/scenario','/api/music'].includes(u.pathname)) {
+      if (u.pathname === '/api/video') {
+        const entry = videoEntries.get((u.searchParams.get('name') || '').toLowerCase());
+        return entry ? new Response(entry.archive.slice(entry.offset,entry.offset+entry.bytes)) : new Response('Video not found',{status:404});
+      }
+      if (['/api/archive','/api/scenario','/api/music','/api/video'].includes(u.pathname)) {
         const file = files.get((u.searchParams.get('name') || '').toLowerCase());
         return file ? new Response(file) : new Response('Файл не найден',{status:404});
       }

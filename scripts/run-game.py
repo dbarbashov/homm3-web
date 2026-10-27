@@ -8,7 +8,7 @@ data=runtime/'data'
 if data.is_symlink():data.unlink()
 data.mkdir(exist_ok=True)
 for source in (game/'Data').iterdir():
-    if source.suffix.lower() in ('.lod','.snd') and not (data/source.name).exists():
+    if source.suffix.lower() in ('.lod','.snd','.vid') and not (data/source.name).exists():
         (data/source.name).symlink_to(source)
 for target, source in [('maps','Maps'),('mp3','Mp3')]:
     link=runtime/target

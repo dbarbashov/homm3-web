@@ -10,6 +10,10 @@ JavaScript provides the browser shell, storage, audio and network transport.
 ## What works
 
 - Single scenarios: adventure map, towns, heroes, battles, AI turns and browser saves.
+- All 20 Complete campaigns (RoE, AB and SoD), original unlock conditions, starting
+  bonuses, scenario transitions, hero carry-over and campaign saves. Custom `.h3c` files
+  are read from your selected installation.
+- Original campaign movies, narration and the Authors/Credits screen.
 - Adaptive adventure viewport, stable overlays, keyboard shortcuts, quick recruitment
   and army splitting. Touch supports a long press for the right mouse button.
 - Public/private multiplayer rooms, invitation links, readiness and in-game room chat.
@@ -18,7 +22,7 @@ JavaScript provides the browser shell, storage, audio and network transport.
   viewport; on phones the sidebar overlays it. Adding the site to the iPhone Home
   Screen removes Safari's browser bars.
 
-The hosted service is experimental. Campaigns, video playback, account registration,
+The hosted service is experimental. Account registration,
 cloud saves and reconnecting to an active match are not implemented. The relay is
 not an authoritative anti-cheat server. Long sessions, eight-player PvP and all
 scenarios have not been comprehensively tested. Keep backups of important saves.
@@ -30,14 +34,17 @@ Heroes III installation. Select its folder in the browser, or configure the loca
 server as described below. Browser-selected files stay on your device.
 
 Required: `Data/h3bitmap.lod`, `h3sprite.lod`, `h3ab_bmp.lod`, `h3ab_spr.lod`,
-`heroes3.snd`, and at least one `.h3m` scenario in `Maps/`. `h3ab_ahd.snd` and
-`Mp3/` provide additional sound and music. Original fonts, maps, artwork, music,
+`heroes3.snd`. `Maps/` supplies `.h3m` scenarios and optional `.h3c` campaigns.
+`h3ab_ahd.snd` and `Mp3/` provide additional sound and music; `Data/VIDEO.VID`
+and `Data/H3ab_ahd.vid` supply original movies. Browser folder selection reads
+only the requested video from each archive, without uploading the installation.
+Original fonts, maps, artwork, music,
 executables and archives must not be added to pull requests.
 
 ## Build and run locally
 
 Tested on macOS ARM64. Install Git, Python 3, Node.js 22+, CMake 3.20+, Clang,
-SDL2 and zlib. The browser SDK revision is pinned in `port/toolchain.lock.json`.
+SDL2, zlib, Make and xz. The browser SDK revision is pinned in `port/toolchain.lock.json`.
 
 ```sh
 git clone https://github.com/dbarbashov/homm3-web.git
@@ -49,7 +56,9 @@ npm start
 
 Open **http://127.0.0.1:8783/** and select your game folder. No npm dependencies
 are required. The build downloads the pinned upstream source, applies the
-reviewable portability patch and compiles the real game modules.
+reviewable portability patch and compiles the real game modules. It also builds
+a pinned minimal LGPL FFmpeg decoder; see [the notices](THIRD_PARTY.md#original-video-decoding)
+for its source, license and replacement/relinking instructions.
 
 To serve your installed game to local devices, create the ignored file
 `.local/game.json`:

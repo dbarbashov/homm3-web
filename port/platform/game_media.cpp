@@ -1,6 +1,6 @@
 // Platform media boundary: original MP3 selection with host audio playback.
 // Original sound effects and MP3 music use platform playback services.
-// Video and force feedback remain disabled.
+// Video decoding is implemented in video.cpp; force feedback is unavailable.
 #include "soundmgr.h"
 #include "music.h"
 #include "sfx.h"
@@ -33,23 +33,6 @@ void soundManager::switchAmbientMusic(int id){
 void soundManager::stopMP3(){Port::Music::stop();}
 void soundManager::startMP3(const char* name,int loops,unsigned char stopSamples){if(stopSamples)stopAllSamples(0);if(name)Port::Music::play(name,loops,musicVolume());}
 extern "C" int AIL_stream_status(HSTREAM){return 0;}
-bool videoPlaying(){return false;}
-bool videoNeedsUpdate(){return false;}
-void videoDrawCurrentFrame(){}
-void videoDrawRects(){}
-void videoPause(){}
-void videoResume(){}
-void videoClose(){}
-void videoOpen(int,int,int,int,int,int,bool,bool){}
-int videoPlay(int,int,int,int,int){return 0;}
-void openSmackerVideo(int,int,int,int,int,int,bool,bool){}
-void deleteAnimHeaders(){}
-namespace SmackManager {
-SmackManagerStruct g_playingSmack{};
-void closeSmacker(){}
-void drawSmackerFrame(){}
-void gotoSmackerFrame(unsigned long){}
-}
 namespace force_feedback { class t_enclosure {}; }
 TImmMouseEffect::TImmMouseEffect(const RECT*,long,unsigned long,unsigned long,unsigned char,unsigned char){}
 TImmMouseEffect::~TImmMouseEffect(){}

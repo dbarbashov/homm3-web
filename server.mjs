@@ -20,7 +20,7 @@ const bindAddress = process.env.HOST || '0.0.0.0';
 const lanAddresses = Object.values(networkInterfaces()).flat().filter(n => n.family === 'IPv4' && !n.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(n.address)).map(n => n.address);
 const allowedHosts = new Set(['127.0.0.1', 'localhost', ...lanAddresses, hostname().toLowerCase()]);
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
-const staticFiles = new Set(['viewer.html', 'site/site.css', 'site/fonts.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/game.webmanifest', 'site/assets.js', 'site/resources.json', 'site/rooms.js', 'site/status.html', 'site/credits.html', 'index.html', 'app.js', 'engine.js', 'renderer.js', 'style.css', 'engine.wasm', 'status.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
+const staticFiles = new Set(['viewer.html', 'site/site.css', 'site/fonts.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/rooms.js', 'site/status.html', 'site/credits.html', 'index.html', 'app.js', 'engine.js', 'renderer.js', 'style.css', 'engine.wasm', 'status.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
 
 const server = http.createServer(async (req, res) => {
   const send = (status, body, type = 'application/octet-stream') => {
@@ -37,7 +37,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'GET') return send(405, 'GET only');
     const url = new URL(req.url, 'http://127.0.0.1');
     const route = decodeURIComponent(url.pathname);
-    if (route === '/api/catalog') return send(200, JSON.stringify({ ready: !!installation, error: setupError, maps: installation?.maps || [], music: installation?.music || [], archives: installation?.archives || [], soundArchives: installation?.soundArchives || [], resources: installation?.entries.size || 0 }), 'application/json');
+    if (route === '/api/catalog') return send(200, JSON.stringify({ ready: !!installation, error: setupError, maps: installation?.maps || [], campaigns: installation?.campaigns || [], videos: [...(installation?.videos?.keys() || [])], music: installation?.music || [], archives: installation?.archives || [], soundArchives: installation?.soundArchives || [], resources: installation?.entries.size || 0 }), 'application/json');
     if (route.startsWith('/api/')) {
       if (!installation) return send(503, 'Configure .local/game.json with gameRoot first');
       const name = url.searchParams.get('name');
@@ -49,11 +49,17 @@ const server = http.createServer(async (req, res) => {
         await pipeline(createReadStream(path.join(installation.root, 'Data', archive.name)), res);
         return;
       }
+      if (route === '/api/video') {
+        const entry = installation.videos.get(name.toLowerCase());
+        if (!entry) return send(404,'Video not found');
+        res.writeHead(200, {'Content-Type':'application/octet-stream','Content-Length':entry.bytes,'Cache-Control':'private, max-age=86400','X-Content-Type-Options':'nosniff'});
+        await pipeline(createReadStream(entry.file,{start:entry.offset,end:entry.offset+entry.bytes-1}),res); return;
+      }
       if (route === '/api/asset') {
         const data = await readAsset(installation, name);
         return data ? send(200, data) : send(404, 'Resource not found');
       }
-      if (route === '/api/scenario' && installation.maps.includes(name)) {
+      if (route === '/api/scenario' && [...installation.maps,...installation.campaigns].includes(name)) {
         const file = path.join(installation.root, 'Maps', name);
         res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' });
         await pipeline(createReadStream(file), res);

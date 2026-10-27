@@ -13,6 +13,7 @@ async function refreshCatalog() {
   const response = await assetFetch('/api/catalog');
   if (!response.ok) throw new Error('Сервер ресурсов недоступен');
   catalog = await response.json();
+  window.homm3VideoNames = new Set((catalog.videos || []).map(n=>n.toLowerCase()));
   window.homm3Music?.configure(catalog.music || []);
   if (!catalog.ready) {
     const hint = document.querySelector('#source-hint');
@@ -85,11 +86,12 @@ async function prepare() {
     }
     status.textContent = 'Запуск исходного C++…';
     if (fullGame) {
+      const scenarios = [...catalog.maps,...(catalog.campaigns || [])];
       let next = 0;
       await Promise.all(Array.from({length: 4}, async () => {
-        while (next < catalog.maps.length) {
-          const name = catalog.maps[next++];
-          status.textContent = 'Загрузка сценариев: ' + next + '/' + catalog.maps.length;
+        while (next < scenarios.length) {
+          const name = scenarios[next++];
+          status.textContent = 'Загрузка сценариев: ' + next + '/' + scenarios.length;
           const response = await assetFetch('/api/scenario?name=' + encodeURIComponent(name));
           if (!response.ok) throw new Error('Не удалось прочитать сценарий ' + name);
           Module.FS.writeFile('/runtime/maps/' + name, new Uint8Array(await response.arrayBuffer()));

@@ -9,6 +9,8 @@ p.add_argument('--probe',action='store_true')
 a=p.parse_args()
 if a.probe and a.target != "native":p.error("The map probe is a native command-line target")
 m=json.loads((ROOT/'port/game-sources.json').read_text())
+subprocess.run([sys.executable,'scripts/build-video.py','--target',a.target],cwd=ROOT,check=True)
+video=ROOT/'build'/f'ffmpeg-{a.target}'/'install'
 if not a.no_compile:
     subprocess.run([sys.executable,'scripts/prepare-port.py'],cwd=ROOT,check=True)
     subprocess.run([sys.executable,'scripts/compile-port.py','--target',a.target,*m['core']],cwd=ROOT,check=True)
@@ -21,7 +23,7 @@ else:
     flags+=['-lidbfs.js','-sUSE_ZLIB=1','-sUSE_SDL=2','-fexceptions','-sASYNCIFY=1','-sASYNCIFY_STACK_SIZE=1048576','-sALLOW_MEMORY_GROWTH=1','-sINITIAL_MEMORY=268435456','-sSTACK_SIZE=8388608','-sFORCE_FILESYSTEM=1','-sEXPORTED_RUNTIME_METHODS=["FS","IDBFS","callMain"]','-sINVOKE_RUN=0','-sEXIT_RUNTIME=0','-sENVIRONMENT=web']
     output='web/port/game.js'
 source='port/probes/game.cpp' if a.probe else 'port/game_main.cpp'
-args=[compiler,*flags,source,*[f'build/cpp-{a.target}/{u}.o' for u in m['core']],*[f'port/platform/{u}.cpp' for u in m['platform']],*[f'port/frontend/{u}.cpp' for u in m['frontend']],'-o',output]
+args=[compiler,*flags,source,*[f'build/cpp-{a.target}/{u}.o' for u in m['core']],*[f'port/platform/{u}.cpp' for u in m['platform']],*[f'port/frontend/{u}.cpp' for u in m['frontend']],'-I'+str(video/'include'),*[str(video/'lib'/('lib'+name+'.a')) for name in ['avformat','avcodec','swscale','swresample','avutil']],'-o',output]
 r=subprocess.run(args,cwd=ROOT,capture_output=True,text=True)
 (ROOT/f'build/link-game-{a.target}.log').write_text(r.stdout+r.stderr)
 print(r.stdout+r.stderr if r.returncode else 'Built '+output)

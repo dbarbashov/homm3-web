@@ -149,7 +149,8 @@
     "preferences",
     "network",
     "hd_qol",
-    "hd_view"
+    "hd_view",
+    "video"
   ],
   "frontend": [
     "bridge"

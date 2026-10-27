@@ -20,3 +20,4 @@ extern "C" BOOL IsIconic(HWND){return FALSE;}
 extern "C" BOOL SetForegroundWindow(HWND){return TRUE;}
 extern "C" BOOL ShowWindow(HWND,int){return TRUE;}
 int g_inSetupDialog=0;
+int g_mpExtendedType=10,g_waitForRemoteReceive=0;

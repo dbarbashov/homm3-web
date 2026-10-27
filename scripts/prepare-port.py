@@ -55,3 +55,9 @@ sound='#include "soundmgr.h"\n#include "sample.h"\n#include "prefs.h"\n#include 
 for signature in ['int soundManager::convertVolume(', 'void soundManager::waitSample(', 'SAMPLE2 loadPlaySample(', 'void clearMemSample(', 'void waitEndSample(']:
     sound+=body('soundmgr',signature)
 (DEST/'src/sound_helpers.cpp').write_text(sound)
+
+# Original movie descriptor names/flags; media decoding is supplied by FFmpeg.
+video=(SOURCE/'src/smackmgr.cpp').read_text()
+start=video.index('DATA(0x006839c0) SVideoDescriptor g_videoDescriptors')
+end=video.index('};',start)+2
+(DEST/'include/port_video_descriptors.h').write_text(video[start:end]+'\n')

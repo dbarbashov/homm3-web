@@ -1,7 +1,7 @@
 #pragma once
 #include <cstddef>
 namespace Port { namespace Sfx {
-constexpr int slots=12;
+constexpr int slots=13;
 bool open();
 void close();
 bool play(int slot,const char* name,const void* wave,size_t size,int loops,int volume);

@@ -1147,9 +1147,90 @@
          if (*it)
              addWidget(*it, -1);
      }
+--- a/src/campaign.cpp
++++ b/src/campaign.cpp
+@@ -1,3 +1,4 @@
++#include "frontend_bridge.h"
+ // campaign.cpp - the Complete-only campaign-set chooser: the five "CSS"
+ // plates (Shadow of Death, Armageddon's Blade, Restoration of Erathia, the
+ // custom-campaign chooser and Exit) that kb.cpp's DoCampaignWindow opens
+@@ -241,7 +242,7 @@
+ {
+     g_soundManager->startMP3(
+         DATA_COMPGEN(0x00660e08, campaignSetMusic, "MainMenu"), 0, 1);
+-    g_windowManager->doDialog(this, heroWindowHandler, 0);
++    Port::runDialog(this, heroWindowHandler, 0, "campaign-sets");
+ }
+ 
+ VA(0x004574d0, 0xC4)
+--- a/src/campaignbrief.cpp
++++ b/src/campaignbrief.cpp
+@@ -1,3 +1,4 @@
++#include "frontend_bridge.h"
+ #include "prefs.h"
+ #include "va.h"
+ 
+@@ -540,9 +541,8 @@
+     std::vector<widget*>& widgets = m_widgets;
+     widgets.reserve(NWIDGETS);
+ 
+-    const char* campaignFilename =
+-        g_game->m_campaign.getCampaignFileName().c_str();
+-    m_campaign = new CampaignHeaderStruct(campaignFilename);
++    const std::string campaignFilename = g_game->m_campaign.getCampaignFileName();
++    m_campaign = new CampaignHeaderStruct(campaignFilename.c_str());
+     if (!m_campaign->load()) {
+         // Retail's dec/je/dec/jne dispatch proves a sparse switch rather
+         // than an if-chain; VC6 sinks these two arms ahead of the shared
+@@ -550,12 +550,12 @@
+         switch (m_campaign->m_fileError) {
+         case CampaignHeaderStruct::CAMPAIGN_FILE_OPEN_FAILED:
+             normalDialog(
+-                formatString(g_generalText->GetText(GENERAL_TEXT_FILE_OPEN_ERROR_FORMAT), campaignFilename).c_str(),
++                formatString(g_generalText->GetText(GENERAL_TEXT_FILE_OPEN_ERROR_FORMAT), campaignFilename.c_str()).c_str(),
+                 1, -1, -1, -1, 0, -1, 0, -1, 0, -1, 0);
+             break;
+         case CampaignHeaderStruct::CAMPAIGN_FILE_VERSION_UNSUPPORTED:
+             normalDialog(
+-                formatString(g_generalText->GetText(GENERAL_TEXT_CAMPAIGN_FILE_PARSE_ERROR_FORMAT), campaignFilename).c_str(),
++                formatString(g_generalText->GetText(GENERAL_TEXT_CAMPAIGN_FILE_PARSE_ERROR_FORMAT), campaignFilename.c_str()).c_str(),
+                 1, -1, -1, -1, 0, -1, 0, -1, 0, -1, 0);
+             break;
+         }
+@@ -941,7 +941,7 @@
+         g_windowManager->m_dialogReturn = DIALOG_RETURN_CANCEL;
+         return;
+     }
+-    g_windowManager->doDialog(this, campaignBriefHandler, 0);
++    Port::runDialog(this, campaignBriefHandler, 0, "campaign-briefing");
+ }
+ 
+ // Dreamcast supplies the original statement groups, helper boundaries and
+@@ -1216,12 +1216,10 @@
+ MAC_ADDRESS(0x06824c, 0x94)
+ std::string getCampaignName()
+ {
+-    const char* fileName = g_game->m_campaign.getCampaignFileName().c_str();
+-    TCampaignBrief::CampaignHeaderStruct* header =
+-        new TCampaignBrief::CampaignHeaderStruct(fileName);
+-
+-    header->load();
+-    return header->getCampaignName();
++    const std::string fileName = g_game->m_campaign.getCampaignFileName();
++    TCampaignBrief::CampaignHeaderStruct header(fileName.c_str());
++    header.load();
++    return header.getCampaignName();
+ }
+ 
+ // COMDAT pairing: std::_Construct<type_map_hero_identity>.
 --- a/src/campaignwindow.cpp
 +++ b/src/campaignwindow.cpp
-@@ -267,7 +267,7 @@
+@@ -1,3 +1,4 @@
++#include "frontend_bridge.h"
+ #include "va.h"
+ 
+ #include <string.h>
+@@ -267,7 +268,7 @@
              campaign - m_firstCampaign + PREVIEW_FIRST_ID, 5, 0, 8));
      }
  
@@ -1158,7 +1239,7 @@
          if (*it)
              addWidget(*it, -1);
          else
-@@ -305,7 +305,7 @@
+@@ -305,7 +306,7 @@
      }
  
      g_campaignWindow = 0;
@@ -1167,6 +1248,15 @@
          if (*it)
              delete *it;
      }
+@@ -317,7 +318,7 @@
+ void TCampaignWindow::doModal()
+ {
+     g_soundManager->startMP3("MainMenu", 0, 1);
+-    g_windowManager->doDialog(this, campaignWindowHandler, 0);
++    Port::runDialog(this, campaignWindowHandler, 0, "campaigns");
+ }
+ 
+ // File-static hover latch: the handler is its only image-wide reader and
 --- a/src/cmbtmgr.cpp
 +++ b/src/cmbtmgr.cpp
 @@ -872,7 +872,7 @@
@@ -1389,7 +1479,33 @@
          }
 --- a/src/customcampaign.cpp
 +++ b/src/customcampaign.cpp
-@@ -1787,7 +1787,7 @@
+@@ -2,6 +2,8 @@
+ // omitted. The older-revision carcass is not claimed from roster order
+ // alone.
+ #include "text.h"
++#include "host_path.h"
++#include <stdexcept>
+ #include "va.h"
+ #include "homm3_minmax.h"
+ #include "bitset_iterator.h"
+@@ -1305,6 +1307,7 @@
+         infile->read(&length, sizeof(length));
+         count = LITTLE_ENDIAN_LONG(length);
+     }
++    if(count>1024*1024)throw std::runtime_error("Campaign text exceeds size limit");
+     unsigned int remaining = count;
+     std::string text;
+     text.resize(count);
+@@ -1315,7 +1318,7 @@
+             count = remaining;
+         else
+             count = sizeof(chunk);
+-        infile->read(chunk, count);
++        if(infile->read(chunk, count)!=int(count))throw std::runtime_error("Truncated campaign text");
+         std::copy(chunk, chunk + count, dest);
+         dest += count;
+         remaining -= count;
+@@ -1787,7 +1790,7 @@
              placeholder = &placeholders[placeholderIndex];
              if (placeholder->m_heroId == -1
                  && static_cast<signed char>(placeholder->m_owner) == player) {
@@ -1398,6 +1514,103 @@
                  heroes.erase(heroes.begin());
                  if (heroes.size() == 0)
                      break;
+@@ -2292,11 +2295,8 @@
+     clearScenarios();
+ 
+     std::filebuf* fileBuf = new std::filebuf;
+-    char currentDirectory[200];
+-    getcwd(currentDirectory, sizeof(currentDirectory));
+-    chdir(DATA_COMPGEN(0x006772d0, oldMainMapsDir, "maps"));
+-    fileBuf->open(m_fileName.c_str(), std::ios::in | std::ios::binary);
+-    chdir(DATA_COMPGEN(0x006755a0, parentDirectory, ".."));
++    const std::string path=Port::hostPath((std::string("maps/")+m_fileName).c_str());
++    fileBuf->open(path.c_str(), std::ios::in | std::ios::binary);
+     if (!fileBuf->is_open()) {
+         delete fileBuf;
+         LODFile* resource =
+@@ -2334,11 +2334,13 @@
+         // vector/player-array states here are that ctor's members).
+         int version = readLittleEndianValue<int>(file);
+         m_campaignVersion = version;
+-        if (m_campaignVersion < 4) {
++        if (m_campaignVersion < 4 || m_campaignVersion > 6) {
+             m_fileError = CAMPAIGN_FILE_VERSION_UNSUPPORTED;
++            freeData();
+             return false;
+         }
+         m_regionMap = readValue<unsigned char>(file);
++        if(m_regionMap>=21)throw std::runtime_error("Invalid campaign region map");
+         m_campaignName = readLengthPrefixedString(file);
+         if (m_campaignName.length() == 0)
+             m_campaignName = g_generalText->GetText(GENERAL_TEXT_UNNAMED);
+@@ -2511,6 +2513,7 @@
+     }
+ 
+     long videoEnd;
++    // Looping backdrop must not block completion of narration and subtitles.
+     if (!SmackManager::g_playingSmack.m_smack2) {
+         videoDone = 1;
+         videoEnd = GameTime::get();
+@@ -2580,7 +2583,7 @@
+                 && speech) {
+                 g_soundManager->memorySample(speech);
+                 speechStarted = 1;
+-            } else if (mp3Started) {
++            } else if (speechStarted) {
+                 if (speech && !speechDone) {
+                     speechDone = g_soundManager->getSampleInfo(
+                                       speech->memSample.memHSample,
+@@ -2598,7 +2601,7 @@
+ 
+             if (g_config.m_videoSubtitles)
+                 redraw = 1;
+-            if (!videoDone && !SmackManager::g_playingSmack.m_smack) {
++            if (!videoDone && !videoPlaying()) {
+                 videoDone = 1;
+                 videoEnd = GameTime::get();
+             }
+--- a/src/customcampaignwindow.cpp
++++ b/src/customcampaignwindow.cpp
+@@ -136,24 +136,17 @@
+ MAC_ADDRESS(0x21f6b0, 0x1d4)
+ void TCustomCampaignWindow::loadCampaignList()
+ {
+-    char currentDirectory[100];
+     _finddata_t fileInfo;
+     TCampaignBrief::CampaignHeaderStruct* header;
+-
+-    getcwd(currentDirectory, sizeof(currentDirectory));
+-    chdir(DATA_COMPGEN(0x006755ac, mapsDirectory, "Maps"));
+-    getcwd(currentDirectory, sizeof(currentDirectory));
+-    long findHandle = _findfirst(
+-        DATA_COMPGEN(0x006755a4, campaignFilePattern, "*.h3c"), &fileInfo);
+-    chdir(DATA_COMPGEN(0x006755a0, parentDirectory, ".."));
+-    getcwd(currentDirectory, sizeof(currentDirectory));
++    long findHandle = _findfirst("maps/*.h3c", &fileInfo);
+     if (findHandle == -1)
+         return;
+ 
+     do {
+         header = new TCampaignBrief::CampaignHeaderStruct(fileInfo.name);
+-        getcwd(currentDirectory, sizeof(currentDirectory));
+-        if (!header->load()) {
++        bool loaded=false;
++        try { loaded=header->load(); } catch(const std::exception&) {}
++        if (!loaded) {
+             delete header;
+         } else if (header->getNumMaps() == 0) {
+             header->freeData();
+@@ -162,10 +155,8 @@
+             header->freeData();
+             m_campaignHeaders.push_back(header);
+         }
+-        getcwd(currentDirectory, sizeof(currentDirectory));
+     } while (_findnext(findHandle, &fileInfo) == 0);
+     _findclose(findHandle);
+-    getcwd(currentDirectory, sizeof(currentDirectory));
+ 
+     std::sort(m_campaignHeaders.begin(), m_campaignHeaders.end(),
+               CampaignHeaderPointerLess());
 --- a/src/dialogbox.cpp
 +++ b/src/dialogbox.cpp
 @@ -36,7 +36,7 @@
@@ -1770,7 +1983,50 @@
  #include "va.h"
  
  #include <stdio.h>
-@@ -4981,3 +4982,52 @@
+@@ -542,9 +543,9 @@
+     if (videoNeedsUpdate())
+         videoDrawRects();
+     int endOffset = 580;
++    unsigned long nextCreditsFrame=GameTime::get();
++    Port::notifyScreen("credits");
+     while (1) {
+-        if (!videoPlaying())
+-            break;
+         pollSound();
+         process1WindowsMessage();
+         msg = g_inputManager->getEvent();
+@@ -557,7 +558,8 @@
+                 break;
+             // fall through
+         default:
+-            if (videoNeedsUpdate()) {
++            if (GameTime::isPast(nextCreditsFrame)) {
++                nextCreditsFrame=GameTime::get()+33;
+                 Bitmap16Bit* screen = g_windowManager->m_screenBitmap;
+                 background->Draw(0, 0, background->GetWidth(),
+                                  background->GetHeight(), screen->GetMap(0, 0),
+@@ -925,10 +927,12 @@
+ MAC_ADDRESS(0x10f884, 0xdc)
+ void showCredits()
+ {
++    videoOpen(33,0,0,800,600,1,false,true);
+     videoDrawCurrentFrame();
+     g_mainBack->Draw(0, 0, g_mainBack->GetWidth(), g_mainBack->GetHeight(),
+                    g_windowManager->m_screenBitmap, 460, 0, false);
+     creditsWait();
++    videoClose();
+     videoDrawCurrentFrame();
+     g_mainBack->Draw(0, 0, g_mainBack->GetWidth(), g_mainBack->GetHeight(),
+                    g_windowManager->m_screenBitmap, 460, 0, false);
+@@ -1644,6 +1648,7 @@
+         case TCampaignSetWindow::CUSTOM_CAMPAIGN_ID: {
+             videoPause();
+             TCustomCampaignWindow customCampaignWindow;
++            Port::notifyScreen("custom-campaigns");
+             customCampaignWindow.doModal(0);
+             if (g_windowManager->m_dialogReturn) {
+                 g_inCampaign = 1;
+@@ -4981,3 +4986,121 @@
  {
      return &g_mapExtra[(z * g_mapHeight + y) * g_mapWidth + x];
  }
@@ -1779,8 +2035,59 @@
 +bool portableLoadGameData(){return loadGameData()!=0;}
 +void portableInitVars(){initVars();}
 +
++// Original campaign choosers remain owned by kb.cpp; expose only the host boundary.
++bool portableChooseCampaign(bool load){
++    g_inSetupDialog=1;g_inCampaign=0;g_mpExtendedType=10;g_mpBaseType=10;
++    g_numHumanPlayers=1;g_waitForRemoteReceive=0;g_directConnect=0;
++    g_game->m_isTutorial=0;g_setupGameType=load?1:0;
++    if(!g_gameSelectBack)g_gameSelectBack=ResourceManager::GetBitmap16("GamSelBk.pcx");
++    int selected=load?pickLoadGame():doCampaignWindow();
++    g_inSetupDialog=0;
++    if(!selected){g_inCampaign=0;return false;}
++    g_inCampaign=1;g_gameCommand=-1;g_runStartEventsOnEntry=0;
++    return true;
++}
++
++// The campaign arm of oldmain's result dispatch, using its original bookkeeping.
++static bool portableCampaignResult(bool alreadyScored){
++    g_completeDrawEnabled=1;
++    g_mouseManager->setPointer(0,mouseManager::DEFAULT_SET);
++    sprintf(g_winText,(*g_generalText)[GENERAL_TEXT_CAMPAIGN_COMPLETE_FORMAT],g_game->getCurrentTurn());
++    SCampaign& campaign=g_game->m_campaign;
++    if(!g_defeatedAllPlayers){lostGame();g_gameOver=0;return false;}
++    if(!alreadyScored){
++        TCampaignBrief::CampaignHeaderStruct header(campaign.getCampaignFileName().c_str());
++        if(!header.load()){g_gameOver=0;return false;}
++        campaign.completeCurrentMap(&header);
++        saveGame(true);
++        campaign.playScenarioEpilogue(&header);
++        if((campaign.m_currentCampaign==g_campaignOrdinal03 || campaign.m_currentCampaign==g_campaignOrdinal18) && campaign.campaignComplete()){
++            if(campaign.m_currentCampaign==g_campaignOrdinal03)playFramedVideo(32,"IntroRim.pcx");
++            showCongrats(0);
++            if(g_showHighScore){g_showHighScore=0;g_highScoreManager->viewHiScore();}
++            g_gameOver=0;g_inCampaign=0;return false;
++        }
++    }
++    const int set=campaign.m_currentCampaign<7?0:(campaign.m_currentCampaign>=13)+1;
++    bool started=false;
++    if(campaign.campaignComplete()){
++        if(!alreadyScored){showCongrats(0);if(g_showHighScore){g_showHighScore=0;g_highScoreManager->viewHiScore();}}
++        if(campaign.m_currentCampaign!=g_campaignOrdinalLast)started=doCampaignWindow(false,set)!=0;
++    }else{
++        TCampaignBrief brief(false,false);brief.doModal();
++        started=g_windowManager->m_dialogReturn!=DIALOG_RETURN_CANCEL;
++    }
++    g_gameOver=0;g_runStartEventsOnEntry=started;g_gameCommand=-1;
++    return started;
++}
++
 +// Same entry sequence as oldmain's runGame branch, exposed to the portable host.
 +void portableAdventureLoop(bool newGame){
++  for(;;){
++    bool scored=g_inCampaign && g_game->m_campaign.m_currentMap>=0
++        && g_game->m_campaign.m_mapScores[g_game->m_campaign.m_currentMap].m_completed;
++    if(scored){g_defeatedAllPlayers=g_gameResultCampaignMapScored;unloadProgressBar();}
++    else {
 +    g_windowManager->m_colorCyclingOn=1;
 +    g_gameInitialized=1;
 +    computeAdvNetControl();
@@ -1798,9 +2105,15 @@
 +    Port::notifyScreen("adventure");
 +    g_executive->mainLoop();
 +    g_executive->removeManager(g_advManager);
++    g_soundManager->m_playSounds=1;g_goSolo=0;g_soundManager->stopAllSamples(1);
++    }
++    if(!g_inCampaign || (!g_gameOver && !scored))break;
++    if(!portableCampaignResult(scored))break;
++    newGame=true;
++  }
 +}
 +
-+// Original oldmain non-campaign restart branch; no new scenario rules.
++// Original oldmain restart branch; no new scenario rules.
 +void portableRestartScenario(){
 +    g_mouseManager->setPointer(1,mouseManager::ADVENTURE_SET);
 +    showProgressBar();incProgressBar(1);
@@ -1808,6 +2121,18 @@
 +    for(int i=0;i<NUM_PLAYERS;++i)playerSave[i]=g_game->m_players[i];
 +    TTownType alignment[NUM_PLAYERS];
 +    memcpy(alignment,g_game->m_setup.m_alignment,sizeof(alignment));
++    if(g_inCampaign){
++        g_game->resetGame(g_game->m_setup.m_difficulty,g_game->m_campaign.m_currentMap,&g_game->m_mapHeader);
++        const std::string filename=g_game->m_campaign.getCampaignFileName();
++        TCampaignBrief::CampaignHeaderStruct header(filename.c_str());
++        const int choice=g_game->m_campaign.m_briefingChoice,map=g_game->m_campaign.m_currentMap;
++        if(!header.load())throw std::runtime_error("Cannot reload campaign");
++        g_game->m_campaign.applyBriefingChoice(choice);
++        int player=header.m_scenarios[map]->getStartOptions()->getPlayer(choice);
++        g_game->m_players[player].m_isHuman=1;g_game->m_players[player].m_isLocal=1;g_localGamePos=player;
++        incProgressBar(1);g_game->setupFirstPlayer();header.startScenario(map,choice);
++        incProgressBar(1);incProgressBar(1);return;
++    }
 +    g_game->resetGame(g_game->m_setup.m_difficulty,0,0);
 +    for(int j=0;j<NUM_PLAYERS;++j){
 +        if(alignment[j]>=0 && (1<<alignment[j]) & g_game->m_mapHeader.m_playerSlotAttributes[j].m_legalAlignments){

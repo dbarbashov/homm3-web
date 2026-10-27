@@ -33,6 +33,7 @@ unsigned char loadSoundHeaders();
 #include <emscripten.h>
 #endif
 bool portableNetworkStart();
+bool portableChooseCampaign(bool load);
 bool portableLoadGameData();
 void portableInitVars();
 void readPrefs();
@@ -62,7 +63,10 @@ int gameTypes(bool load){
         background();{TGameTypeWindow menu(load);menu.doModal();}
         int cmd=g_windowManager->m_dialogReturn;
         if(cmd==TGameTypeWindow::QUIT_ID || cmd<0)return -1;
-        if(cmd==TGameTypeWindow::SINGLE_ID){int next=scenarios(load);if(next!=-1)return next;}
+        if(cmd==TGameTypeWindow::CAMPAIGN_ID){
+            if(portableChooseCampaign(load)){portableAdventureLoop(!load);return g_gameCommand;}
+        }
+        else if(cmd==TGameTypeWindow::SINGLE_ID){int next=scenarios(load);if(next!=-1)return next;}
 #ifdef __EMSCRIPTEN__
         else if(cmd==TGameTypeWindow::MULTIPLAYER_ID && !load){
             // The original menu enters the browser room flow before initializing a network game.
