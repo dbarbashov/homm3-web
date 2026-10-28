@@ -151,7 +151,8 @@
     "hd_qol",
     "hd_view",
     "video",
-    "lod_cache"
+    "lod_cache",
+    "smooth_camera"
   ],
   "frontend": [
     "bridge"

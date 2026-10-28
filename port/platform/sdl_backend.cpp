@@ -2,6 +2,7 @@
 #include "sdl_backend.h"
 #ifdef HOMM3_FULL_GAME
 #include "smackmgr.h"
+#include "smooth_camera.h"
 #endif
 #include "cursor.h"
 #include <SDL.h>
@@ -187,6 +188,9 @@ void commitFrame(int x,int y,int width,int height){
     if(right<=x || bottom<=y)return;
     g_initWin.Draw(x,y,right-x,bottom-y,&frontBuffer,x,y,false);
     frameDirty=true;
+#ifdef HOMM3_FULL_GAME
+    Port::Camera::traceFrame(right-x,bottom-y);
+#endif
     if(!overlays.empty() && !closingOverlay){
         auto& layer=overlays.back();
         // An idle pump during widget construction must keep the old scene.

@@ -16,6 +16,8 @@ JavaScript provides the browser shell, storage, audio and network transport.
 - Original campaign movies, narration and the Authors/Credits screen.
 - Adaptive adventure viewport, stable overlays, keyboard shortcuts, quick recruitment
   and army splitting. Touch supports a long press for the right mouse button.
+- Optional smooth camera following during hero movement, with a saved toggle in the
+  browser menu. The original instant movement setting still skips animation.
 - Public/private multiplayer rooms, invitation links, readiness and in-game room chat.
   Every player runs an independent client; this is network play, not hot-seat.
 - A compact tavern sidebar with room and chat tables. The game fills the available

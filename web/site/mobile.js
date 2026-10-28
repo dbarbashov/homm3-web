@@ -20,6 +20,17 @@
   }
   function closeControls(){ $('view-actions').hidden=true;$('view-toggle').setAttribute('aria-expanded','false'); }
   $('view-toggle').onclick=()=>{const open=$('view-actions').hidden;$('view-actions').hidden=!open;$('view-toggle').setAttribute('aria-expanded',String(open));};
+  let smoothCamera=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  try { const saved=localStorage.getItem('homm3.smoothCamera');if(saved!==null)smoothCamera=saved==='true'; } catch {}
+  function setSmoothCamera(value) {
+    window.homm3SmoothCamera=value;
+    $('smooth-camera').setAttribute('aria-pressed',String(value));
+  }
+  setSmoothCamera(smoothCamera);
+  $('smooth-camera').onclick=()=>{
+    setSmoothCamera(!window.homm3SmoothCamera);
+    try { localStorage.setItem('homm3.smoothCamera',String(window.homm3SmoothCamera)); } catch {}
+  };
   const touch=new window.Homm3Touch(canvas,$('touch-hold-ring'));
   $('fullscreen').onclick=async()=>{
     closeControls();

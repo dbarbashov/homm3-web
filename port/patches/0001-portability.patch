@@ -1464,13 +1464,14 @@
      type_dialog_resource reward;
 --- a/src/cursor.cpp
 +++ b/src/cursor.cpp
-@@ -1,4 +1,5 @@
+@@ -1,4 +1,6 @@
  #include "va.h"
 +#include "hd_view.h"
++#include "smooth_camera.h"
  #include "objnames.h"
  
  #include "cursor.h"
-@@ -87,8 +88,8 @@
+@@ -87,8 +89,8 @@
      if (g_specialHideCursor)
          return;
  
@@ -1481,7 +1482,7 @@
  
      hero* curr = g_game->getCurrHero();
      if (curr) {
-@@ -139,8 +140,8 @@
+@@ -139,8 +141,8 @@
      if (g_specialHideCursor)
          return;
  
@@ -1492,7 +1493,7 @@
  
      hero* curr = g_game->getCurrHero();
      if (curr) {
-@@ -168,26 +169,26 @@
+@@ -168,26 +170,26 @@
  {
      if (g_completeDrawEnabled) {
          if (!g_specialHideCursor) {
@@ -1530,7 +1531,25 @@
  
              hero* curr = g_game->getCurrHero();
  
-@@ -300,8 +301,8 @@
+@@ -218,7 +220,7 @@
+                     curr->getHflip());
+             }
+ 
+-            if (m_heroMoving) {
++            if (m_heroMoving && !Port::Camera::intermediateFrame()) {
+                 m_cursorFrameCount = (m_cursorFrameCount + 1) % 8;
+                 if (!m_cursorFrameCount && g_newWalkSample) {
+                     g_soundManager->stopSample(g_walkSample);
+@@ -226,7 +228,7 @@
+                         g_soundManager->memorySample(g_newWalkSample);
+                     g_newWalkSample = 0;
+                 }
+-            } else {
++            } else if (!m_heroMoving) {
+                 m_cursorFrameCount = 0;
+             }
+         }
+@@ -300,8 +302,8 @@
      stopCursor(1);
  
      if (g_completeDrawEnabled) {
@@ -1541,7 +1560,7 @@
          m_radarOrigin.m_z = curr->m_z;
      }
  
-@@ -339,14 +340,14 @@
+@@ -339,14 +341,14 @@
          int speedIndex;
          speedIndex = g_config.m_walkSpeed[g_currentPlayer->isLocalHuman()];
  
@@ -1559,15 +1578,40 @@
          } else {
              int walkSpeed;
              int iterations;
-@@ -374,7 +375,7 @@
+@@ -361,9 +363,14 @@
+             m_scrollX = startVals[xInc + 1];
+             m_scrollY = startVals[yInc + 1];
+ 
++            const bool smoothCamera = Port::Camera::enabled();
++            const unsigned long animationStart = GameTime::get();
+             for (int i = 0; i < iterations; ++i) {
+-                unsigned long nextFrameTime;
+-                nextFrameTime = GameTime::get() + scrollDelayValue;
++                // Keep one timeline: extra redraws must not extend every step.
++                const unsigned long nextFrameTime = smoothCamera
++                    ? animationStart + (i + 1) * scrollDelayValue
++                    : GameTime::get() + scrollDelayValue;
++                const int fromX = m_scrollX, fromY = m_scrollY;
+ 
+                 if (walkSpeed == CURSOR_IRREGULAR_STEP_PIXELS && i == 1) {
+                     m_scrollX -= xInc * CURSOR_IRREGULAR_MIDDLE_STEP_PIXELS;
+@@ -373,9 +380,13 @@
+                     m_scrollY -= yInc * walkSpeed;
                  }
  
-                 completeDraw(0);
+-                completeDraw(0);
 -                g_windowManager->updateScreen(0, 8, 608, 544);
-+                g_windowManager->updateScreen(0, 8, Port::HD::mapRight()+8, Port::HD::mapHeight());
-                 GameTime::delayTil(nextFrameTime);
+-                GameTime::delayTil(nextFrameTime);
++                if (smoothCamera) {
++                    Port::Camera::animateStep(*this, fromX, fromY, nextFrameTime);
++                } else {
++                    completeDraw(0);
++                    g_windowManager->updateScreen(0, 8, Port::HD::mapRight()+8, Port::HD::mapHeight());
++                    GameTime::delayTil(nextFrameTime);
++                }
              }
          }
+     }
 --- a/src/customcampaign.cpp
 +++ b/src/customcampaign.cpp
 @@ -2,6 +2,8 @@
