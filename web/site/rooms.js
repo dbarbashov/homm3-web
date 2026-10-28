@@ -79,7 +79,7 @@
     if(!previous || view!=='chat') view='room';
     $('room-title').textContent=room.title;
     $('room-mode').hidden=!room.fastGame;
-    $('room-mode').textContent=room.fastGame?'Быстрая игра: одновременное развитие, при столкновениях — очередность. Режим в разработке; запуск пока недоступен.':'';
+    $('room-mode').textContent=room.fastGame?'Быстрая игра: все действуют одновременно. Бои и выборы событий — автоматические. Новый день начинается после готовности всех. Экспериментальный режим.':'';
     $('room-meta').textContent=`${room.private?'По приглашению':'Открытая'} · ${room.players.length}/${room.capacity} · ${phaseLabel({...room,players:room.players.length})}`;
     $('players').replaceChildren();
     room.players.forEach(p=>{
@@ -90,19 +90,19 @@
       li.append(flag,label,state);$('players').append(li);
     });
     syncPlayerFlags();
+    if(room.fastGame && room.phase==='interrupted')window.dispatchEvent(new CustomEvent('homm3-fast-control',{detail:{type:'fast_state',interrupted:true,message:'Связь с участником потеряна. Быстрая партия остановлена.'}}));
     const self=room.players.find(p=>p.id===me), everyone=room.players.length>=2 && room.players.every(p=>p.ready && p.online);
     $('ready').textContent=preparing?'Подготовка…':self?.ready?'Отменить готовность':'Подготовить игру';
     $('ready').classList.toggle('secondary',!!self?.ready);
-    $('ready').disabled=!!room.fastGame || !window.homm3Boot.ready || preparing || room.phase!=='waiting' || socket?.readyState!==WebSocket.OPEN;
+    $('ready').disabled=!window.homm3Boot.ready || preparing || room.phase!=='waiting' || socket?.readyState!==WebSocket.OPEN;
     $('ready').hidden=room.phase!=='waiting';
     $('launch-room').hidden=me!==room.host || room.phase!=='waiting' || !self?.ready;
-    $('launch-room').disabled=!!room.fastGame || !everyone || socket?.readyState!==WebSocket.OPEN;
+    $('launch-room').disabled=!everyone || socket?.readyState!==WebSocket.OPEN;
     $('preparation').hidden=room.phase!=='waiting';
     $('copy-invite').hidden=room.phase!=='waiting';
     $('room-next').textContent=room.phase==='waiting'
       ? !window.homm3Boot.ready?'Загружаем движок… Подготовка станет доступна через несколько секунд.'
       : preparing?'Загружаем файлы игры и проверяем версию…'
-      : room.fastGame?'Быстрая игра пока не готова к запуску. Создайте обычную комнату, чтобы играть сейчас.'
       : !self?.ready?'Подготовьте игру. Затем организатор сможет выбрать карту.'
       : room.players.length<2?(room.private?'Отправьте приглашение второму игроку.':'Ждём ещё одного игрока. Комната видна в общем списке.')
       : !everyone?'Ждём готовности: '+room.players.filter(p=>!p.ready || !p.online).map(p=>p.name).join(', ')
@@ -134,10 +134,22 @@
       ws.onmessage=event=>{
         if(socket!==ws)return;
         if(event.data instanceof ArrayBuffer) {
+          if(event.data.byteLength>=4 && new DataView(event.data).getUint32(0,true)===0x31545346) {
+            if(!room?.fastGame)return;
+            try {
+              const view=new DataView(event.data),length=view.getUint32(4,true);
+              if(event.data.byteLength>4*1024*1024 || !length || length>65536 || 8+length>=event.data.byteLength)throw Error('Некорректное состояние быстрой игры');
+              const meta=JSON.parse(new TextDecoder().decode(new Uint8Array(event.data,8,length)));
+              if(!Number.isSafeInteger(meta.revision) || meta.revision<1 || !Number.isSafeInteger(meta.day))throw Error('Некорректная ревизия игры');
+              window.dispatchEvent(new CustomEvent('homm3-fast-packet',{detail:{meta,bytes:new Uint8Array(event.data.slice(8+length))}}));
+            }catch(e){window.homm3FastTransport.interrupt(e.message);}
+            return;
+          }
           if(queuedBytes+event.data.byteLength>32*1024*1024){notice('Очередь сетевых сообщений переполнена');ws.close();return;}
           incoming.push(new Uint8Array(event.data));queuedBytes+=event.data.byteLength;return;
         }
         const data=JSON.parse(event.data);
+        if(data.type?.startsWith('fast_')){window.dispatchEvent(new CustomEvent('homm3-fast-control',{detail:data}));return;}
         if(data.type==='hello') {
           clearTimeout(timeout);me=data.id;token=data.token;write('sessionStorage','homm3.session',token);
           nickname=data.name;write('localStorage','homm3.nickname',nickname);$('player-name').value=nickname;renderIdentity();
@@ -282,9 +294,10 @@
     try {
       if(window.homm3Boot.running)throw new Error('Игра уже запущена.');
       const targetRoom=room.id,ready=!room.players.find(p=>p.id===me)?.ready;
+      if(ready && room.fastGame && !window.homm3FastNative)throw new Error('Не загрузился модуль быстрой игры. Обновите страницу.');
       if(ready){preparing=true;renderRoom(room);syncPreparation();await window.homm3Boot.prepare();}
       if(room?.id!==targetRoom)return;
-      send({type:'ready',ready,build:window.homm3Build || ''});notice(ready?'Файлы готовы.':'');
+      send({type:'ready',ready,build:window.homm3Build || '',fastProtocol:room.fastGame?1:0});notice(ready?'Файлы готовы.':'');
     }catch(e){notice(e.message);}finally{preparing=false;if(room)renderRoom(room);syncPreparation();}
   };
   $('launch-room').onclick=()=>{try{send({type:'launch'});}catch(e){notice(e.message);}};
@@ -295,9 +308,29 @@
     if(Array.from(text).length>300){$('chat-error').textContent='Не больше 300 символов';return;}
     try{send({type:'chat',text});pendingChat=text;updateChatButton();}catch(e){$('chat-error').textContent=e.message;}
   };
-  for(const event of ['keydown','keyup','keypress'])window.addEventListener(event,e=>{if(e.target.closest('#tavern,dialog') || e.target.matches('input,textarea,select,button,a'))e.stopImmediatePropagation();},true);
+  for(const event of ['keydown','keyup','keypress'])window.addEventListener(event,e=>{if(e.target.closest('#fast-panel'))return;if(e.target.closest('#tavern,dialog') || e.target.matches('input,textarea,select,button,a'))e.stopImmediatePropagation();},true);
   setInterval(()=>{if(socket?.readyState===WebSocket.OPEN)send({type:'ping'});},15000);
   setInterval(()=>{if(!tavern.hidden && view==='browser')refresh();},5000);
+  window.homm3FastTransport={
+    get isAuthority(){return !!room?.fastGame && me===room.host;},
+    sendCommand(command,id,day){
+      if(!room?.fastGame || room.phase!=='playing')throw new Error('Быстрая игра ещё не запущена');
+      send({type:'fast_command',id,day,command});return true;
+    },
+    sendSnapshot(meta,bytes){
+      if(!this.isAuthority || !['setup','playing'].includes(room.phase))throw new Error('Только движок хозяина подтверждает игру');
+      const clean={seq:meta.seq,ok:meta.ok===true,error:String(meta.error || '').slice(0,500),day:meta.day,gameOver:meta.gameOver===true,roster:meta.roster};
+      const json=new TextEncoder().encode(JSON.stringify(clean));
+      if(!bytes?.byteLength || json.length>65536 || json.length+bytes.byteLength+8>4*1024*1024)throw new Error('Состояние превышает лимит прототипа');
+      if(socket?.readyState!==WebSocket.OPEN || socket.bufferedAmount>8*1024*1024)throw new Error('Состояние не удалось отправить');
+      const packet=new Uint8Array(8+json.length+bytes.byteLength),view=new DataView(packet.buffer);
+      view.setUint32(0,0x31545346,true);view.setUint32(4,json.length,true);packet.set(json,8);packet.set(bytes,8+json.length);socket.send(packet);return true;
+    },
+    interrupt(message){
+      window.dispatchEvent(new CustomEvent('homm3-fast-control',{detail:{type:'fast_state',interrupted:true,message:String(message)}}));
+      try{if(room?.fastGame)send({type:'fast_fault'});}catch{}
+    }
+  };
   window.homm3Network={
     get self(){return room?.players.find(p=>p.id===me)?.dpid || 0;},
     get fastGame(){return room?.fastGame===true;},

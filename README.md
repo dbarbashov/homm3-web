@@ -190,3 +190,20 @@ CC0-1.0 and third-party components retain their own licenses. See [LICENSE](LICE
 and [THIRD_PARTY.md](THIRD_PARTY.md). This is an unofficial project, unaffiliated
 with the original creators or rights holders. Source licenses do not grant rights
 to the original game data or trademarks.
+
+## Experimental simultaneous play
+
+Room creators can enable **Быстрая игра** (off by default). Everyone submits
+movement, building and recruitment commands to one canonical original engine;
+the Rust relay validates actors and sequences commits. The day advances after
+all live humans finish. Combat and mandatory choices resolve automatically.
+The original map renderer is paired with a separate browser command panel.
+
+This prototype requires the matching relay implementation. It does not yet
+provide manual map spells, army/artifact rearrangement, or reconnect/resume.
+Legacy single-player, campaigns and ordinary network rooms keep their original
+controls and turns. See [protocol and limits](docs/fast-game-implementation/contract.md).
+
+Validation: `python3 scripts/test-fast-game.py`, `python3 scripts/test-fast-ui.py`,
+and `SITE_URL=http://127.0.0.1:8800 python3 scripts/fast-game-browser-smoke.py`
+(use `BROWSER=webkit` for WebKit). Browser runs use silent audio.

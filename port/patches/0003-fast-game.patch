@@ -1,0 +1,135 @@
+--- a/src/advmgr.cpp
++++ b/src/advmgr.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ // The DC roster identifies source interfaces; retained retail addresses
+ // are corroborated with bodies, calls and vtables. Several DC helpers have
+ // no standalone retail body because VC6 expands their calls. Their canonical
+@@ -1219,6 +1220,7 @@
+ int advManager::main(message& msg)
+ {
+     if(msg.m_id == MESSAGE_NONE) Port::HD::resizeAdventure();
++    if (Port::Fast::enabled()) return Port::Fast::adventureMain(msg);
+
+     if (m_status == STATUS_SUSPENDED)
+         return 0;
+--- a/src/events.cpp
++++ b/src/events.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "text.h"
+ #include "va.h"
+ #include "includes.h"
+@@ -6064,7 +6065,7 @@
+     if (g_goSolo && g_goSoloTest) {
+         replay = 1;
+     }
+-    if (!rightHuman && !leftHuman && !replay) {
++    if (Port::Fast::executing() || (!rightHuman && !leftHuman && !replay)) {
+         int winner;
+         NewmapCell* target = g_game->getCell(point);
+         if (aiQuickCombat(leftHero, rightHero, *rightArmyGroup, rightTown,
+--- a/src/kb.cpp
++++ b/src/kb.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "frontend_bridge.h"
+ #include "va.h"
+
+@@ -3059,7 +3060,7 @@
+                      -1, 0, -1, 0, -1, 0, -1, 0);
+     } else {
+         for (i = 0; i < g_gamePlayerCount; i++)
+-            if (!g_game->m_playerDisabled[i] && g_game->isLocalHuman(i))
++            if (!g_game->m_playerDisabled[i] && (Port::Fast::executing() ? g_game->isHuman(i) : g_game->isLocalHuman(i)))
+                 break;
+         if (i == g_gamePlayerCount) {
+             g_gameOver = 1;
+@@ -4577,6 +4578,7 @@
+     int resType1, int resExtra1, int resType2, int resExtra2,
+     int special, int timeout, int resType3, int resExtra3)
+ {
++    if (Port::Fast::executing()) { g_windowManager->m_dialogReturn=DIALOG_RETURN_ACCEPT; return; }
+     TNormalDialogInfo dialogInfo;
+     dialogInfo.m_dialogText = text;
+     dialogInfo.m_x = x;
+@@ -5057,7 +5059,8 @@
+         CCombatTypeMsg msg(g_config.m_quickCombat);transmitRemoteData(&msg,0x7f,false,true);
+     }
+     if(newGame){g_game->checkForTimeEvent();g_game->checkForTownEvent();}
+-    g_turnDuration.start();
++    Port::Fast::begin();
++    if(!Port::Fast::enabled())g_turnDuration.start();
+     Port::notifyScreen("adventure");
+     g_executive->mainLoop();
+     g_executive->removeManager(g_advManager);
+--- a/src/winmgr.cpp
++++ b/src/winmgr.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "va.h"
+ #include "hd_view.h"
+
+@@ -244,6 +245,7 @@
+ int heroWindowManager::doDialog(heroWindow* dialogWindow,
+                                 TDialogHandler dialogFunction, int fadeIn)
+ {
++    if (Port::Fast::executing()) { m_dialogReturn=1; return 1; }
+     int endFlag;
+
+     if (g_dialogNestCount++ == 0)
+--- a/src/exec.cpp
++++ b/src/exec.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "va.h"
+
+ #include "exec.h"
+@@ -67,6 +68,7 @@
+ MAC_ADDRESS(0x0c3af4, 0x2c0)
+ int executive::doDialog(baseManager* newDialog)
+ {
++    if (Port::Fast::executing()) { g_windowManager->m_dialogReturn=1; return 1; }
+     executive dialogExec;
+     baseManager* savedMgr[20];
+     baseManager* savedPrev[20];
+--- a/src/game.cpp
++++ b/src/game.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "host_path.h"
+ #include "prefs.h"
+ #include "text.h"
+@@ -3369,10 +3370,11 @@
+     try {
+         {
+             TGzFile outfile(fullPath, compression);
+-            save(&outfile);
++            const int result=save(&outfile);
++            if (Port::Fast::executing() && result<0) return 0;
+         }
+         saveGameTimer.stop();
+-        Port::notifySave(fullPath);
++        if (!Port::Fast::executing()) Port::notifySave(fullPath);
+         return 1;
+     } catch (const TGzFile::TOpenFailure&) {
+         normalDialog(
+@@ -3476,8 +3478,8 @@
+         underground_gate_exits.clear();
+         m_monsterIdentifiers.clear();
+
+-        load(&infile);
+-        return 1;
++        const int result=load(&infile);
++        return Port::Fast::enabled() && result<0 ? 0 : 1;
+     } catch (const TGzFile::TOpenFailure&) {
+         return 0;
+     }
+@@ -6783,6 +6785,7 @@
+ MAC_ADDRESS(0x0dd7dc, 0x89c)  // dc-name/order + retail caller/callee/body
+ void game::nextPlayer()
+ {
++    if (Port::Fast::enabled()) return; // Day barrier belongs to the fast controller.
+     int toWho;
+     int humans;
+     int i;

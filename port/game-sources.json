@@ -152,7 +152,8 @@
     "hd_view",
     "video",
     "lod_cache",
-    "smooth_camera"
+    "smooth_camera",
+    "fast_game"
   ],
   "frontend": [
     "bridge"

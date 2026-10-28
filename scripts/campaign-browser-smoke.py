@@ -2,10 +2,12 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 import json,os
+from browser_audio import use_silent_audio
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'test-results/campaigns';OUT.mkdir(parents=True,exist_ok=True)
 BASE=os.environ.get('SITE_URL','http://127.0.0.1:8783')
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True);page=browser.new_page(viewport={'width':1100,'height':850});logs=[];errors=[]
+ use_silent_audio(page)
  def log(text):
   logs.append(text);(OUT/'live.log').write_text('\n'.join(logs))
  page.on('console',lambda m:log(m.text));page.on('pageerror',lambda e:(errors.append(str(e)),log('ERROR '+str(e))))

@@ -1,6 +1,7 @@
 """Drive the real recovered game through SDL input; never mutate game memory."""
 from pathlib import Path
-import json, time
+import json, time, os
+from browser_audio import use_silent_audio
 from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'test-results'
@@ -8,6 +9,7 @@ OUT.mkdir(exist_ok=True)
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(viewport={'width': 1200, 'height': 1100})
+    use_silent_audio(page)
     errors, logs, states = [], [], []
     page.on('pageerror', lambda e: errors.append(e.stack))
     page.on('console', lambda m: logs.append(m.text))
@@ -39,7 +41,7 @@ with sync_playwright() as p:
         page.locator('#start').click(timeout=60000)
         screen('main')
     try:
-        page.goto('http://127.0.0.1:8783/port/game.html')
+        page.goto(os.environ.get('SITE_URL','http://127.0.0.1:8783')+'/port/game.html')
         start()
         c.hover(position={'x': 650, 'y': 70})
         page.wait_for_timeout(250)

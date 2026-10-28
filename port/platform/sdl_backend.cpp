@@ -2,6 +2,7 @@
 #include "sdl_backend.h"
 #ifdef HOMM3_FULL_GAME
 #include "smackmgr.h"
+#include "fast_game.h"
 #include "smooth_camera.h"
 #endif
 #include "cursor.h"
@@ -200,6 +201,10 @@ void commitFrame(int x,int y,int width,int height){
     present();
 }
 void present(){
+#ifdef HOMM3_FULL_GAME
+    // Commands may temporarily switch actor/fog context. Publish only the restored local view.
+    if(Port::Fast::executing())return;
+#endif
     if(!texture || closingOverlay)return;
     const int offsetX=HD::overlayOffsetX(),offsetY=HD::overlayOffsetY();
     const bool pointerChanged=cursorNeedsRedraw(offsetX,offsetY);
@@ -289,6 +294,9 @@ static int pcScanCode(SDL_Scancode code){
 void process1WindowsMessage(){
     SDL_Event e;
     while(SDL_PollEvent(&e)){
+#ifdef HOMM3_FULL_GAME
+        if(Port::Fast::blocksInput() && (e.type==SDL_KEYDOWN||e.type==SDL_KEYUP||e.type==SDL_MOUSEBUTTONDOWN||e.type==SDL_MOUSEBUTTONUP))continue;
+#endif
         if(e.type==SDL_WINDOWEVENT && (e.window.event==SDL_WINDOWEVENT_ENTER || e.window.event==SDL_WINDOWEVENT_LEAVE)){Port::cursorInside(e.window.event==SDL_WINDOWEVENT_ENTER);}
         else if(e.type==SDL_QUIT){
             quit=true;
