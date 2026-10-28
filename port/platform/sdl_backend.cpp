@@ -339,6 +339,7 @@ void process1WindowsMessage(){
         // Keep each EM_ASM within the toolchain's 16 positional argument limit.
         EM_ASM({window.homm3CampaignState=({active:!!$0,campaign:$1,map:$2,choice:$3,completed:$4});},g_inCampaign,g_game->m_campaign.m_currentCampaign,g_game->m_campaign.m_currentMap,g_game->m_campaign.m_briefingChoice,g_game->m_campaign.m_currentMap>=0 && g_game->m_campaign.m_currentMap<int(g_game->m_campaign.m_mapScores.size())?g_game->m_campaign.getCurrentScenario()->m_completed:0);
         EM_ASM({Object.assign(window.homm3GameState,{localPlayer:$0,remote:$1,humans:$2});},g_localGamePos,g_remoteOn,g_numHumanPlayers);
+        EM_ASM({Object.assign(window.homm3GameState,{turnLimitIndex:$0,turnTimerOn:!!$1,turnTimerExpired:!!$2});},g_game->m_setup.m_turnDuration,g_turnDuration.isOn(),g_turnDuration.isExpired());
         EM_ASM({window.homm3NetworkState=({control:$0,currentLocal:$1,visibility:$2,radarX:$3,radarY:$4});},g_thisNetGotAdventureControl,g_currentPlayer->isLocalHuman(),g_mapVisibilityBit,g_advManager->m_radarOrigin.m_x,g_advManager->m_radarOrigin.m_y);
         EM_ASM({Object.assign(window.homm3NetworkState,{turnSlot:$0,aiOwner:$1,map:UTF8ToString($2)});},g_netLocalGamePos,g_game->getLastHuman(),g_game->m_setup.m_filename);
         EM_ASM({window.homm3HeroStates=[];});
