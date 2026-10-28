@@ -1036,16 +1036,13 @@
      if (!getOwner()
          || !getOwner()->isWieldingArtifact(ARTIFACT_AMMO_CART))
          m_monInfo.numShots--;
-@@ -1260,8 +1263,11 @@
+@@ -1260,8 +1263,10 @@
                                          armyToAttack, killed);
          if (g_combatManager->isQuickCombat())
              return;
--        waitSample(SHOOT_SAMPLE);
--    }
 +        Port::traceCombat("shot-animation-end", group, index);
-+        // The host audio backend owns its PCM until playback finishes. Do not
-+        // hold the next turn for the tail of a shot after its impact is visible.
-+    }
+         waitSample(SHOOT_SAMPLE);
+     }
 +    Port::traceCombat("shot-end", group, index);
  }
  

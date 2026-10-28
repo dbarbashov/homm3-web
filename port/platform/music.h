@@ -6,5 +6,4 @@ void resume();
 void volume(float value);
 bool playing();
 void close();
-void serviceScene();
 }}

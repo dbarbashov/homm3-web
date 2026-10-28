@@ -5,9 +5,6 @@
 #include "music.h"
 #include "sfx.h"
 #include "prefs.h"
-#include "advmgr.h"
-#include "townmgr.h"
-#include "cmbtmgr.h"
 #include "smackmgr.h"
 #include "imm_mouse.h"
 #include "sample.h"
@@ -40,16 +37,3 @@ unsigned char TImmMouseEffect::start(){return 0;}
 void TImmMouseEffect::stop(){}
 unsigned char playImmEffect(const char*,int){return 0;}
 SAMPLE2 g_nullSample2{nullptr,nullptr};
-
-// Restore ambient playback when returning from a modal town/battle.
-// This host lifecycle adapter uses the original terrain-to-track selection.
-namespace Port { namespace Music {
-void serviceScene(){
-    static bool wasModal=false;
-    const bool modal=g_townViewActive || g_combatActive;
-    if(wasModal && !modal && g_advManager && g_advManager->m_status==1
-       && g_advManager->m_lastTerrain>=0 && g_advManager->m_lastTerrain<9)
-        g_soundManager->switchAmbientMusic(g_terrainMusicIds[g_advManager->m_lastTerrain]);
-    wasModal=modal;
-}
-}}

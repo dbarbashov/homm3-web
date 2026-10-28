@@ -7,6 +7,7 @@ Set CPU=4 to emulate a slower CPU; RUN chooses the output directory.
 """
 
 from pathlib import Path
+from browser_audio import use_silent_audio
 from playwright.sync_api import sync_playwright
 import json, os, time, collections
 
@@ -16,6 +17,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 with sync_playwright() as p:
     b = p.chromium.launch(headless=True)
     page = b.new_page(viewport={"width": 1200, "height": 900})
+    use_silent_audio(page)
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.add_init_script(
@@ -118,6 +120,8 @@ with sync_playwright() as p:
                 if(e.phase==='shot-end'){
                     const shot=perf.sounds.findLast(s=>s.name==='storshot.82M');
                     e.audioTailPlaying=!!shot&&homm3Sfx.playing(shot.slot);
+                    e.audioContext=homm3Music.context().state;
+                    e.audioTime=homm3Music.context().currentTime;
                 }
                 return push.call(this,e);
             };
@@ -143,7 +147,7 @@ with sync_playwright() as p:
         page.wait_for_timeout(500)
     page.mouse.move(5, 5)
     page.wait_for_function("homm3GameState.autoCombat===1")
-    deadline = time.monotonic() + int(os.getenv("SECONDS", "45"))
+    deadline = time.monotonic() + int(os.getenv("SECONDS", "90"))
     while (
         time.monotonic() < deadline
         and page.evaluate("homm3PortDiagnostics.screen") != "combat-results"
@@ -165,13 +169,15 @@ with sync_playwright() as p:
         counts[nodes[i]["callFrame"]["functionName"]] += dt / 1000
     shots = [e for e in result["markers"] if e["phase"] == "shot-end"]
     assert len(shots) >= 3, shots
-    assert all(e["audioTailPlaying"] for e in shots), "Shot sound was interrupted"
+    assert not any(e["audioTailPlaying"] for e in shots), (
+        "Original shot sound wait was bypassed"
+    )
     waits = [
         b["at"] - a["at"]
         for a, b in zip(result["markers"], result["markers"][1:])
         if a["phase"] == "shot-animation-end" and b["phase"] == "shot-end"
     ]
-    assert len(waits) == len(shots) and max(waits) < 50, waits
+    assert len(waits) == len(shots) and min(waits) > 900, waits
     assert result["screen"] == "combat-results", result["screen"]
     assert not errors, errors
     assert result["settings"]["combatSpeed"] == 2, (

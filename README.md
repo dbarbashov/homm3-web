@@ -49,8 +49,10 @@ For a repeatable local performance trace, run `npm start`, then
 browser tests running. Python Playwright with Chromium is required. `CPU=4` is
 an artificial stress test, not an estimate of any particular player's hardware.
 For ranged combat, run `CPU=4 python3 scripts/combat-performance-probe.py`.
-It verifies that shot animations finish without waiting for the sound tail,
-while the original sound continues playing. New combat preferences default to
+Combat/audio probes use Chromium's silent output device; the real Web Audio graph
+still runs without depending on the test machine's speakers.
+It verifies the original ranged-attack wait for the sound to finish after impact.
+Music uses the original fade-out/fade-in timing; the engine controls track changes. New combat preferences default to
 fast animations; existing saved speed settings are preserved.
 
 ## Build and run locally

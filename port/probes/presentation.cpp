@@ -56,7 +56,7 @@ int main(int argc,char** argv){
         g_mouseManager->hidePointer();g_initWin.Draw(0,0,800,600,&image,0,0,false);Port::drawCursor(image);
         require(*image.GetMap(400,300)==0x5678,"hidden cursor drawn");g_mouseManager->showPointer(true);
         Port::Music::play("MainMenu",0,.4f);require(Port::Music::playing(),"native MP3 playback");
-        SDL_Delay(80);Port::Music::stop();require(!Port::Music::playing(),"native music stop");
+        SDL_Delay(80);Port::Music::stop();SDL_Delay(1100);require(!Port::Music::playing(),"native music stop");
         Port::Music::resume();require(Port::Music::playing(),"native music resume");Port::Music::close();
         Port::closeDisplay();delete g_mouseManager;g_mouseManager=nullptr;
         puts("{\"dirtyRectangle\":true,\"idlePreservesFrame\":true,\"clipping\":true,\"originalCursorSets\":5,\"nativeMp3\":true}");return 0;

@@ -1,12 +1,13 @@
 """Real browser: original cursors, decoded MP3 output and combat presentation."""
 from pathlib import Path
+from browser_audio import use_silent_audio
 from playwright.sync_api import sync_playwright
-import json,time
-ROOT=Path(__file__).resolve().parents[1];out=ROOT/'test-results/media-after';out.mkdir(parents=True,exist_ok=True)
+import json,time,os
+ROOT=Path(__file__).resolve().parents[1];out=ROOT/'test-results'/('media-after' if os.getenv('BROWSER','chromium')=='chromium' else 'media-after-webkit');out.mkdir(parents=True,exist_ok=True)
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True)
+    browser=getattr(p,os.getenv('BROWSER','chromium')).launch(headless=True)
     context=browser.new_context(viewport={'width':1100,'height':1100},record_video_dir=str(out),record_video_size={'width':1100,'height':1100})
-    page=context.new_page();errors=[];samples=[]
+    page=context.new_page();use_silent_audio(page);errors=[];samples=[]
     page.on('pageerror',lambda e:errors.append(e.stack))
     c=page.locator('#canvas')
     def screen(name):page.wait_for_function('(name)=>window.homm3PortDiagnostics?.screen===name',arg=name,timeout=90000)
@@ -22,15 +23,16 @@ with sync_playwright() as p:
     def pos(x,y):
         box=c.bounding_box();return {'x':x*box['width']/800,'y':y*box['height']/600}
     try:
-        page.goto('http://127.0.0.1:8783/port/game.html');page.locator('#start').click(timeout=90000);screen('main')
+        page.goto('http://127.0.0.1:8783/port/game.html?hd=0');page.locator('#start').click(timeout=90000);screen('main')
         c.hover(position=pos(650,70));capture('menu','mainmenu',0)
         assert page.evaluate('getComputedStyle(document.querySelector("canvas")).cursor')=='none'
         assert page.locator('#music-toggle').count()==0
         c.press('n');screen('new');c.press('s');screen('scenarios');c.press('b');page.wait_for_timeout(4000);c.press('Enter');screen('adventure')
         c.hover(position=pos(320,280));capture('adventure',cursor=1)
         c.dblclick(position=pos(770,231),delay=150);page.wait_for_timeout(1500);capture('town','town')
-        c.press('Escape');page.wait_for_timeout(800);c.hover(position=pos(320,280));capture('town-return','dirt',cursor=1)
-        for key in ['ArrowDown','ArrowDown','End']:c.press(key);page.wait_for_timeout(1700)
+        c.press('Escape');page.wait_for_timeout(3000);c.hover(position=pos(320,280));capture('town-return','town',cursor=1)
+        c.press('ArrowDown');page.wait_for_timeout(2000);capture('town-return-after-move','dirt',cursor=1)
+        for key in ['ArrowDown','End']:c.press(key);page.wait_for_timeout(1700)
         page.wait_for_function('window.homm3GameState.combat===1');c.hover(position=pos(400,250));capture('battle','combat',2)
         c.click(position=pos(178,580),delay=120);page.mouse.move(20,20)
         deadline=time.monotonic()+180

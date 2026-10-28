@@ -24,7 +24,6 @@
 #include "hero.h"
 #include "cmbtmgr.h"
 #include "frontend_bridge.h"
-#include "music.h"
 #include "prefs.h"
 #endif
 #include "wingraph.h"
@@ -306,7 +305,6 @@ void process1WindowsMessage(){
     }
     if(g_mouseManager)g_mouseManager->checkUpdate();
 #ifdef HOMM3_FULL_GAME
-    Port::Music::serviceScene();
     if(g_soundManager)g_soundManager->serviceSounds();
 #endif
 #ifdef __EMSCRIPTEN__
