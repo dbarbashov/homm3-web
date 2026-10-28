@@ -1,7 +1,7 @@
 /* Browser lobby: browse first, choose an identity before joining, then prepare. */
 (() => {
   const $ = id => document.getElementById(id);
-  const tavern = $('tavern'), colors = ['#db5650','#538fd4','#c6ae82','#65ae58','#e49b46','#b782c5','#58b6b6','#d08eaa'];
+  const tavern = $('tavern');
   function read(store, key) { try { return window[store].getItem(key) || ''; } catch { return ''; } }
   function write(store, key, value) { try { window[store].setItem(key, value); return true; } catch { return false; } }
   const params = new URLSearchParams(location.hash.slice(1));
@@ -61,6 +61,13 @@
     if(nearBottom) log.scrollTop=log.scrollHeight;
     if(view!=='chat') $('room-chat').textContent='Чат · новое сообщение';
   }
+  function syncPlayerFlags() {
+    for(const flag of $('players').querySelectorAll('.flag')) {
+      const player=room?.phase==='playing' && window.homm3HeroStates?.find(p=>p.human && p.dpid===Number(flag.dataset.dpid));
+      flag.style.setProperty('--flag',player ? `var(--player-${player.player})` : 'var(--dim)');
+    }
+  }
+  window.addEventListener('homm3-player-color',syncPlayerFlags);
   function renderRoom(next) {
     const previous=room; room=next; window.homm3Room=room; setBusy(false);
     $('chat-input').disabled=!room; updateChatButton();
@@ -73,13 +80,14 @@
     $('room-title').textContent=room.title;
     $('room-meta').textContent=`${room.private?'По приглашению':'Открытая'} · ${room.players.length}/${room.capacity} · ${phaseLabel({...room,players:room.players.length})}`;
     $('players').replaceChildren();
-    room.players.forEach((p,i)=>{
+    room.players.forEach(p=>{
       const li=document.createElement('li'), flag=document.createElement('span'), label=document.createElement('span'), state=document.createElement('small');
-      flag.className='flag';flag.style.setProperty('--flag',colors[i]);
+      flag.className='flag';flag.dataset.dpid=String(p.dpid);
       label.textContent=p.name+(p.id===me?' · вы':'')+(p.id===room.host?' · организатор':'');
       state.textContent=!p.online?'Нет связи':room.phase==='playing'?'В игре':p.ready?'Готов':'Не готов';
       li.append(flag,label,state);$('players').append(li);
     });
+    syncPlayerFlags();
     const self=room.players.find(p=>p.id===me), everyone=room.players.length>=2 && room.players.every(p=>p.ready && p.online);
     $('ready').textContent=preparing?'Подготовка…':self?.ready?'Отменить готовность':'Подготовить игру';
     $('ready').classList.toggle('secondary',!!self?.ready);

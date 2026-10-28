@@ -106,25 +106,35 @@ def main():
     parser.add_argument('--server', default='http://127.0.0.1:8783')
     args = parser.parse_args()
     palette = fetch(args.server, 'players.pal')
-    # RIFF PAL: 24-byte header, 256 RGBA records. Player zero is red.
+    # The original palette has eight consecutive ramps of 32 player colors.
     if len(palette) < 1048 or palette[:4] != b'RIFF' or palette[8:16] != b'PAL data':
         raise ValueError('Invalid Players.pal')
-    red = bytes(value for index in range(32) for value in palette[24 + index * 4:27 + index * 4])
-    dialog = bitmap(fetch(args.server, 'sysopbck.pcx'), red)
+    palettes = [bytes(value for index in range(player * 32, (player + 1) * 32)
+                      for value in palette[24 + index * 4:27 + index * 4])
+                for player in range(8)]
+    dialog_data = fetch(args.server, 'sysopbck.pcx')
+    menu_data = fetch(args.server, 'iam009.def')
+    dialog = bitmap(dialog_data, palettes[0])
     if dialog.size != (481, 487):
         raise ValueError('Unexpected system-options layout')
     images = {
         'leather': bitmap(fetch(args.server, 'dibox128.pcx')),
-        'frame': frame(dialog),
         'gold-button': blank_button(dialog.crop((246, 298, 346, 346))),
         'dark-button': dialog.crop((28, 77, 74, 109)),
     }
-    normal, pressed = menu_sprites(fetch(args.server, 'iam009.def'), red)
-    images.update({'menu-icon': normal, 'menu-icon-pressed': pressed})
+    rules = [':root{\n' + '\n'.join('--h3-' + name + ':' + data_url(image) + ';'
+             for name, image in images.items()) + '\n}']
+    for player, ramp in enumerate(palettes):
+        normal, pressed = menu_sprites(menu_data, ramp)
+        colored = {'frame': frame(bitmap(dialog_data, ramp)),
+                   'menu-icon': normal, 'menu-icon-pressed': pressed}
+        selector = ':root' if player == 0 else ':root[data-player-color="' + str(player) + '"]'
+        rules.append(selector + '{\n' + '\n'.join('--h3-' + name + ':' + data_url(image) + ';'
+                     for name, image in colored.items()) + '\n}')
     output = ROOT / 'web/site/skin.css'
-    output.write_text('/* Locally rendered original game assets. Do not commit. */\n:root{\n' +
-                      '\n'.join('--h3-' + name + ':' + data_url(image) + ';' for name, image in images.items()) + '\n}\n')
-    print(f'Rendered {len(images)} skin elements: {output} ({output.stat().st_size} bytes, excluded from Git)')
+    output.write_text('/* Locally rendered original game assets. Do not commit. */\n' + '\n'.join(rules) + '\n')
+    print(f'Rendered shared skin and 8 player palettes: {output} ({output.stat().st_size} bytes, excluded from Git)')
+
 
 
 if __name__ == '__main__':
