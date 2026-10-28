@@ -94,3 +94,15 @@ errors contain a message and `retryAfterMs`, preserving the user's draft.
 A `ready` message includes a build/asset fingerprint. Only the host can `launch`
 a room with at least two ready online players. `ping` receives `pong`.
 See `web/site/rooms.js` and `port/platform/network.cpp` for the client boundary.
+
+## Fast-game room setting (development only)
+
+The `fastGame` boolean defaults to false when absent. Room discovery, snapshots,
+join/reconnect and host migration preserve the setting; it is fixed at creation.
+The client exposes an unchecked “Быстрая игра” switch with an explanation.
+
+This branch prepares configuration only. Simultaneous engine turns are not
+implemented. Enabled rooms explicitly show development status and cannot prepare
+or launch; the matching relay also rejects launch so they never silently run a
+sequential match under the fast-game label. Do not deploy this unfinished setting.
+The scope of the first actual engine mode is pending the user's choice.

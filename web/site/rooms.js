@@ -78,6 +78,8 @@
     invitation=null;
     if(!previous || view!=='chat') view='room';
     $('room-title').textContent=room.title;
+    $('room-mode').hidden=!room.fastGame;
+    $('room-mode').textContent=room.fastGame?'Быстрая игра: одновременное развитие, при столкновениях — очередность. Режим в разработке; запуск пока недоступен.':'';
     $('room-meta').textContent=`${room.private?'По приглашению':'Открытая'} · ${room.players.length}/${room.capacity} · ${phaseLabel({...room,players:room.players.length})}`;
     $('players').replaceChildren();
     room.players.forEach(p=>{
@@ -91,15 +93,16 @@
     const self=room.players.find(p=>p.id===me), everyone=room.players.length>=2 && room.players.every(p=>p.ready && p.online);
     $('ready').textContent=preparing?'Подготовка…':self?.ready?'Отменить готовность':'Подготовить игру';
     $('ready').classList.toggle('secondary',!!self?.ready);
-    $('ready').disabled=!window.homm3Boot.ready || preparing || room.phase!=='waiting' || socket?.readyState!==WebSocket.OPEN;
+    $('ready').disabled=!!room.fastGame || !window.homm3Boot.ready || preparing || room.phase!=='waiting' || socket?.readyState!==WebSocket.OPEN;
     $('ready').hidden=room.phase!=='waiting';
     $('launch-room').hidden=me!==room.host || room.phase!=='waiting' || !self?.ready;
-    $('launch-room').disabled=!everyone || socket?.readyState!==WebSocket.OPEN;
+    $('launch-room').disabled=!!room.fastGame || !everyone || socket?.readyState!==WebSocket.OPEN;
     $('preparation').hidden=room.phase!=='waiting';
     $('copy-invite').hidden=room.phase!=='waiting';
     $('room-next').textContent=room.phase==='waiting'
       ? !window.homm3Boot.ready?'Загружаем движок… Подготовка станет доступна через несколько секунд.'
       : preparing?'Загружаем файлы игры и проверяем версию…'
+      : room.fastGame?'Быстрая игра пока не готова к запуску. Создайте обычную комнату, чтобы играть сейчас.'
       : !self?.ready?'Подготовьте игру. Затем организатор сможет выбрать карту.'
       : room.players.length<2?(room.private?'Отправьте приглашение второму игроку.':'Ждём ещё одного игрока. Комната видна в общем списке.')
       : !everyone?'Ждём готовности: '+room.players.filter(p=>!p.ready || !p.online).map(p=>p.name).join(', ')
@@ -189,6 +192,7 @@
     for(const r of filtered){
       const row=list.insertRow();row.className='room-card';row.dataset.unavailable=String(!canJoin(r));
       const name=row.insertCell(),title=document.createElement('span'),status=document.createElement('small');
+      if(r.fastGame){const badge=document.createElement('span');badge.className='room-mode-badge';badge.textContent='Быстрая игра';name.append(badge);}
       title.className='room-name';title.textContent=r.title;title.title=r.title;status.className='room-mobile-phase';status.textContent=phaseLabel(r);name.append(title,status);
       const host=row.insertCell();host.className='room-host';host.textContent=r.host;
       const count=row.insertCell();count.className='room-count';count.textContent=`${r.players}/${r.capacity}`;
@@ -215,7 +219,7 @@
   async function proceed(action) {
     pendingAction=null;
     if(!action){show(invitation?'invite':'browser');return;}
-    if(action.type==='create'){show('create');$('room-name').focus();return;}
+    if(action.type==='create'){$('fast-game').checked=false;syncFastGame();show('create');$('room-name').focus();return;}
     show(invitation?'invite':'browser');setBusy(true);notice('Входим в комнату…');
     try{await connect();if(room){notice('Вы уже находитесь в комнате. Сначала покиньте её.');setBusy(false);return;}send({type:'join',room:action.room,...(action.invite?{invite:action.invite}:{})});}
     catch(e){setBusy(false);notice(e.message);}
@@ -232,10 +236,12 @@
   $('edit-invite-name').onclick=()=>requestEntry(null,true);
   $('show-create').onclick=()=>requestEntry({type:'create'});
   $('cancel-create').onclick=()=>show('browser');
+  function syncFastGame(){$('fast-game-state').textContent=$('fast-game').checked?'Вкл.':'Выкл.';}
+  $('fast-game').onchange=syncFastGame;
   $('visibility').onchange=()=>{$('visibility-hint').textContent=$('visibility').value==='private'?'Комнату не видно в списке. Вход только по вашей ссылке.':'Комната появится в общем списке. Любой игрок сможет войти.';};
   $('create-room').onsubmit=async e=>{
     e.preventDefault();if(busy)return;setBusy(true);
-    try{await connect();if(room){setBusy(false);notice('Вы уже находитесь в комнате.');return;}send({type:'create',title:$('room-name').value,capacity:Number($('capacity').value),private:$('visibility').value==='private'});}
+    try{await connect();if(room){setBusy(false);notice('Вы уже находитесь в комнате.');return;}send({type:'create',title:$('room-name').value,capacity:Number($('capacity').value),private:$('visibility').value==='private',fastGame:$('fast-game').checked});}
     catch(e){setBusy(false);notice(e.message);}
   };
   $('join-invite').onclick=()=>requestEntry({type:'join',...invitation});
@@ -294,6 +300,7 @@
   setInterval(()=>{if(!tavern.hidden && view==='browser')refresh();},5000);
   window.homm3Network={
     get self(){return room?.players.find(p=>p.id===me)?.dpid || 0;},
+    get fastGame(){return room?.fastGame===true;},
     get host(){return room?.players.find(p=>p.id===room.host)?.dpid || 0;},
     get players(){return room?.players || [];},
     get connected(){return socket?.readyState===WebSocket.OPEN && room && ['setup','playing'].includes(room.phase);},
