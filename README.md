@@ -190,3 +190,12 @@ CC0-1.0 and third-party components retain their own licenses. See [LICENSE](LICE
 and [THIRD_PARTY.md](THIRD_PARTY.md). This is an unofficial project, unaffiliated
 with the original creators or rights holders. Source licenses do not grant rights
 to the original game data or trademarks.
+
+## Optional production analytics
+
+The production site uses a self-hosted GoatCounter collector at `/telemetry`.
+`web/site/telemetry.js` sends only fixed page/action names, once per page load,
+without URL parameters, identities, room or chat content. DNT, GPC and the
+[privacy-page opt-out](https://homm3.xyz/site/privacy.html) disable sending.
+The collector is optional: failure does not block gameplay, and localhost sends
+nothing. Operational metrics and deployment configuration live in the private relay repository.

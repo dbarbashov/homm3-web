@@ -45,3 +45,5 @@ html[data-player-color] #exit-dialog{border-color:var(--player-light)}
 html[data-player-color] #view-actions,html[data-player-color] #tavern{border-color:var(--player-color)}
 html[data-player-color] :is(button,a,input,select):focus-visible{outline-color:var(--player-light)}
 html[data-player-color] #room-progress{accent-color:var(--player-light)}
+
+.privacy-link{font-size:11px;opacity:.65;color:inherit;text-decoration:none;margin-left:14px}.privacy-link:hover{opacity:1;text-decoration:underline}
