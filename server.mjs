@@ -18,8 +18,8 @@ const port = Number(process.env.PORT || 8783);
 const bindAddress = process.env.HOST || '0.0.0.0';
 const lanAddresses = Object.values(networkInterfaces()).flat().filter(n => n.family === 'IPv4' && !n.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(n.address)).map(n => n.address);
 const allowedHosts = new Set(['127.0.0.1', 'localhost', ...lanAddresses, hostname().toLowerCase()]);
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
-const staticFiles = new Set(['site/site.css', 'site/fonts.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/report-bug.js', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/rooms.js', 'site/status.html', 'site/credits.html', 'index.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
+const mime = { '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
+const staticFiles = new Set(['site/crest.webp', 'site/ui-leather.webp', 'site/ui-gold.webp', 'favicon.ico', 'site/favicon.png', 'site/site.css', 'site/fonts.css', 'site/skin.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/report-bug.js', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/rooms.js', 'site/status.html', 'site/credits.html', 'index.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
 
 const server = http.createServer(async (req, res) => {
   const send = (status, body, type = 'application/octet-stream') => {
@@ -68,8 +68,8 @@ const server = http.createServer(async (req, res) => {
       return send(404, 'Not found');
     }
     const filename = route === '/' ? 'index.html' : ['/port', '/port/'].includes(route) ? 'port/index.html' : route.slice(1);
-    if (filename === 'site/fonts.css') {
-      return send(200, await readFile(path.join(root,'web',filename)).catch(()=>Buffer.from('/* Optional original UI fonts. */')), 'text/css');
+    if (['site/fonts.css', 'site/skin.css'].includes(filename)) {
+      return send(200, await readFile(path.join(root,'web',filename)).catch(()=>Buffer.from('/* Optional original UI assets. */')), 'text/css');
     }
     if (!staticFiles.has(filename)) return send(404, 'Not found');
     send(200, await readFile(path.join(root, 'web', filename)), mime[path.extname(filename)]);

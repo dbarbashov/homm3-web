@@ -2,6 +2,7 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 import json, os
+from browser_audio import use_silent_audio
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'test-results/mobile';OUT.mkdir(parents=True,exist_ok=True)
 BASE=os.environ.get('SITE_URL','http://127.0.0.1:8783')
 with sync_playwright() as p:
@@ -9,12 +10,16 @@ with sync_playwright() as p:
     browser=getattr(p,engine).launch(headless=True)
     context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,device_scale_factor=3)
     page=context.new_page();errors=[];page.on('pageerror',lambda e:(errors.append(e.stack),print(e.stack,flush=True)))
+    use_silent_audio(page)
     page.on('console',lambda m:print(m.text,flush=True) if m.type=='error' else None)
     page.add_init_script("Object.defineProperty(document,'fullscreenEnabled',{get:()=>false})")
     def shot(name):
         page.screenshot(path=str(OUT/(engine+'-'+name+'.png')));print(name,page.evaluate('({view:window.homm3Viewport,screen:window.homm3PortDiagnostics?.screen,canvas:[Module.canvas.width,Module.canvas.height],dpr:devicePixelRatio})'),flush=True)
     def control(selector):
-        page.locator('#view-toggle').tap();page.locator(selector).tap()
+        page.locator('#view-toggle').tap()
+        if page.locator(selector).evaluate("e=>!!e.closest('#extra-commands[hidden]')"):
+            page.locator('#extra-toggle').tap()
+        page.locator(selector).tap()
     def point(x,y):
         r=page.locator('#canvas').bounding_box();return (r['x']+x*r['width']/800,r['y']+y*r['height']/600)
     try:

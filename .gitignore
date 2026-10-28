@@ -30,6 +30,7 @@ web/status.html
 web/port/status.html
 web/site/status.html
 web/site/fonts.css
+web/site/skin.css
 __pycache__/
 *.pyc
 *.woff

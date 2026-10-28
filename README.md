@@ -99,6 +99,21 @@ This produces an ignored `web/site/fonts.css`. Without it the UI uses system fon
 The font conversion assumes the Cyrillic CP1251 edition; see `--encoding` for
 other editions. Generated original glyphs are not licensed by this repository.
 
+The crest and leather/metal textures in `web/site/*.webp` are generated artwork,
+created with imagegen using the original UI as a visual reference. Prompts are in
+`output/imagegen/`. The red-and-gold panel frame can additionally be rendered
+from your own installation:
+
+```sh
+python3 -m pip install Pillow
+python3 scripts/build-ui-skin.py
+```
+
+This creates an ignored `web/site/skin.css` with embedded original-resource
+images; the current theme uses its frame. Those extracted assets stay outside
+Git. Without them the frame uses its CSS fallback; the generated crest and
+textures still work. The bundle includes both optional stylesheets when present.
+
 ### Multiplayer development
 
 The room relay lives in a **separate private repository**. It is deliberately not
