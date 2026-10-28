@@ -197,7 +197,8 @@ Room creators can enable **Быстрая игра** (off by default). Everyone 
 movement, building and recruitment commands to one canonical original engine;
 the Rust relay validates actors and sequences commits. The day advances after
 all live humans finish. Combat and mandatory choices resolve automatically.
-The original map renderer is paired with a separate browser command panel.
+Movement, town construction, tavern hiring, recruitment and ending the day use
+the original game windows and controls. There is no separate browser action panel.
 
 This prototype requires the matching relay implementation. It does not yet
 provide manual map spells, army/artifact rearrangement, or reconnect/resume.
@@ -205,5 +206,5 @@ Legacy single-player, campaigns and ordinary network rooms keep their original
 controls and turns. See [protocol and limits](docs/fast-game-implementation/contract.md).
 
 Validation: `python3 scripts/test-fast-game.py`, `python3 scripts/test-fast-ui.py`,
-and `SITE_URL=http://127.0.0.1:8800 python3 scripts/fast-game-browser-smoke.py`
+and `SITE_URL=http://127.0.0.1:8800 python3 scripts/fast-native-browser-smoke.py`
 (use `BROWSER=webkit` for WebKit). Browser runs use silent audio.

@@ -1,3 +1,4 @@
+#include "fast_game.h"
 #include "hd_army.h"
 #include "windows.h"
 #ifdef __EMSCRIPTEN__
@@ -70,6 +71,13 @@ void recruitAll(town* target,bool baseCreatures,bool skipConfirmation) {
     auto current=planRecruitment(target->getArmy(),g_currentPlayer->m_resources,offers);
     for(int i=0;i<7;++i)if(current.counts[i]!=plan.counts[i] || (offers[i].creature>=0 && target->m_population[offers[i].populationSlot]!=offers[i].available))return;
     if(!g_currentPlayer->isLocalHuman() || target->m_owner!=g_netLocalGamePos)return;
+    if(Port::Fast::nativeUI()) {
+        for(int i=6;i>=0;--i)if(current.counts[i]) {
+            if(baseCreatures && offers[i].populationSlot>=7){Port::Fast::unavailable();return;}
+            if(!Port::Fast::request(4,target->m_id,offers[i].populationSlot,current.counts[i]))return;
+        }
+        return;
+    }
     target->getArmy()=current.army;
     std::copy(current.remaining.begin(),current.remaining.end(),g_currentPlayer->m_resources);
     for(int i=0;i<7;++i)if(current.counts[i])target->m_population[offers[i].populationSlot]-=current.counts[i];

@@ -184,6 +184,9 @@ bool setFullscreen(bool enabled){return window && SDL_SetWindowFullscreen(window
 // The renderer's back buffer may contain an unfinished animation. Only
 // robAppBlit's dirty rectangle commits pixels to the visible front buffer.
 void commitFrame(int x,int y,int width,int height){
+#ifdef HOMM3_FULL_GAME
+    if(Port::Fast::executing() && !Port::Fast::state().drawing)return;
+#endif
     const int right=std::min(g_initWin.GetWidth(),x+width),bottom=std::min(g_initWin.GetHeight(),y+height);
     x=std::max(0,x);y=std::max(0,y);
     if(right<=x || bottom<=y)return;
@@ -292,6 +295,9 @@ static int pcScanCode(SDL_Scancode code){
     case SDL_SCANCODE_SPACE:return 57;case SDL_SCANCODE_UP:return 72;case SDL_SCANCODE_DOWN:return 80;case SDL_SCANCODE_LEFT:return 75;case SDL_SCANCODE_RIGHT:return 77;case SDL_SCANCODE_TAB:return 15;case SDL_SCANCODE_ESCAPE:return 1;case SDL_SCANCODE_N:return 49;case SDL_SCANCODE_S:return 31;case SDL_SCANCODE_M:return 50;case SDL_SCANCODE_T:return 20;case SDL_SCANCODE_L:return 38;case SDL_SCANCODE_H:return 35;case SDL_SCANCODE_C:return 46;case SDL_SCANCODE_F1:return 59;case SDL_SCANCODE_F4:return 62;case SDL_SCANCODE_RETURN:return 28;default:return 0;}
 }
 void process1WindowsMessage(){
+#ifdef HOMM3_FULL_GAME
+    Port::Fast::tick();
+#endif
     SDL_Event e;
     while(SDL_PollEvent(&e)){
 #ifdef HOMM3_FULL_GAME
@@ -326,13 +332,14 @@ void process1WindowsMessage(){
     static uint32_t lastSettings=0;
     if(SDL_GetTicks()-lastSettings>=250){
         lastSettings=SDL_GetTicks();
-    if(g_game && g_currentPlayer) {
+    if(g_game && g_currentPlayer && !Port::Fast::executing()) {
         auto* h=g_game->getCurrHero();
         if(h)for(int i=0;i<7;++i)EM_ASM({if(!window.homm3Army)window.homm3Army=[];window.homm3Army[$0]=({type:$1,count:$2});},i,h->m_army.m_armies[i],h->m_army.m_numTroops[i]);
     }
 
         EM_ASM({window.homm3Settings=({music:$0,sound:$1,heroSpeed:$2,aiSpeed:$3,scrollSpeed:$4,showRoute:$5,combatSpeed:$6,combatGrid:$7});},g_config.m_musicVolume,g_config.m_soundVolume,g_config.m_walkSpeed[1],g_config.m_walkSpeed[0],g_config.m_windowScrollSpeed,g_config.m_showRoute,g_config.m_combatSpeed,g_config.m_showCombatGrid);
     }
+    if(!Port::Fast::executing()){
     static bool lastCombat=false;
     if(bool(g_combatActive)!=lastCombat){lastCombat=bool(g_combatActive);Port::notifyScreen(lastCombat?"combat":"adventure");}
     EM_ASM({window.homm3HDState=({width:$0,height:$1,mapWidth:$2,mapHeight:$3,adventure:!!$4,overlayX:$5,overlayY:$6,layers:$7});},Port::HD::width(),Port::HD::height(),Port::HD::mapRight()-8,Port::HD::mapHeight(),Port::HD::adventureVisible(),Port::HD::overlayOffsetX(),Port::HD::overlayOffsetY(),int(overlays.size()));
@@ -356,6 +363,7 @@ void process1WindowsMessage(){
             if(first)EM_ASM({window.homm3HeroStates[$0].army=Array.from({length:7},function(_,n){return new DataView(HEAPU8.buffer).getInt32($1+4*n,true);});window.homm3HeroStates[$0].counts=Array.from({length:7},function(_,n){return new DataView(HEAPU8.buffer).getInt32($2+4*n,true);});},i,first->m_army.m_armies,first->m_army.m_numTroops);
         }
     }
+    } // Only publish the restored local context.
 #endif
 #ifdef HOMM3_FULL_GAME
     videoNextFrame();

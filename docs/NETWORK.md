@@ -121,7 +121,9 @@ Enabled rooms run the simultaneous prototype on ordinary maps. A host C++/WASM
 engine applies authenticated commands ordered by the matching relay; snapshots
 update each client. Players move, build and recruit during the same day. The next
 day starts after all live human players finish. Combat and mandatory choices are
-automatic. Legacy rooms retain sequential turns and original controls.
+automatic. Fast rooms use the original map, town, tavern, recruitment and end-turn
+controls; JavaScript only transports commands. The native event pump services
+commands while dialogs remain open. Legacy rooms retain sequential turns.
 
 The prototype remains opt-in and requires the companion relay branch. Manual
 adventure spells, army/artifact rearrangement, reconnect/resume and long-session

@@ -1,0 +1,295 @@
+--- a/src/advmgr.cpp
++++ b/src/advmgr.cpp
+@@ -1063,11 +1063,14 @@
+         int noMove;
+         // Before normalization: bFoughtBattle.
+         int foughtBattle;
++        const bool nativeFastRoute=Port::Fast::nativeUI();
++        std::vector<int> fastSteps;
++        if(nativeFastRoute)for(int step=0;step<g_searchArray->getPathSteps();++step)fastSteps.push_back(g_searchArray->getStep(step));
+         int i = g_searchArray->getPathSteps() - 1;
+         if (i >= 0) {
+             while (1) {
+                 {
+-                    eventCell = moveHero(g_searchArray->getStep(i),
++                    eventCell = moveHero(nativeFastRoute?fastSteps[i]:g_searchArray->getStep(i),
+                                          i == 0, triggerPoint, &noMove, 0,
+                                          &foughtBattle, 0);
+                     m_advWindow->updateHeroLocator(-1, 1, 1);
+@@ -1220,7 +1223,7 @@
+ int advManager::main(message& msg)
+ {
+     if(msg.m_id == MESSAGE_NONE) Port::HD::resizeAdventure();
+-    if (Port::Fast::enabled()) return Port::Fast::adventureMain(msg);
++    if (Port::Fast::enabled()) Port::Fast::tick();
+ 
+     if (m_status == STATUS_SUSPENDED)
+         return 0;
+@@ -1471,6 +1474,7 @@
+         break;
+ 
+     case KEYCODE_D:
++        if (Port::Fast::nativeUI()) { Port::Fast::unavailable(); break; }
+         if (waitingPlayer)
+             break;
+         if (!g_game->getCurrHero())
+@@ -2377,6 +2381,7 @@
+ MAC_ADDRESS(0x00c154, 0x94)
+ void advManager::drawRolloverText(char* text)
+ {
++    if (Port::Fast::nativeUI() && Port::Fast::state().ready) text=const_cast<char*>(Port::Fast::waitingText());
+     union {
+         char* m_pointer;
+         int m_value;
+@@ -3847,6 +3852,7 @@
+ MAC_ADDRESS(0x00f088, 0x668)  // anchor-callee
+ int advManager::processSearch(int x, int y, int z)
+ {
++    if (Port::Fast::nativeUI()) { Port::Fast::unavailable(); return 0; }
+     hero* currHero;
+     SAMPLE2 digSample;
+     int player;
+--- a/src/game.cpp
++++ b/src/game.cpp
+@@ -6720,6 +6720,7 @@
+                     ARTIFACT_ANGELIC_ALLIANCE);
+     }
+ 
++    if (Port::Fast::nativeUI()) { showDismiss=false; upgradeToType=CREATURE_NONE; }
+     TViewArmyWindow* viewArmyWindow = new TViewArmyWindow(
+         &group, iarmy, thisHero, thisTown, x, y, upgradeToType, showDismiss,
+         !isQuickView, hasAngelicAlliance);
+@@ -6794,7 +6795,7 @@
+ MAC_ADDRESS(0x0dd7dc, 0x89c)  // dc-name/order + retail caller/callee/body
+ void game::nextPlayer()
+ {
+-    if (Port::Fast::enabled()) return; // Day barrier belongs to the fast controller.
++    if (Port::Fast::enabled()) { if (Port::Fast::nativeUI()) Port::Fast::request(5); return; }
+     int toWho;
+     int humans;
+     int i;
+--- a/src/cursor.cpp
++++ b/src/cursor.cpp
+@@ -1,3 +1,5 @@
++#include "fast_game.h"
++#include "town.h"
+ #include "va.h"
+ #include "hd_view.h"
+ #include "smooth_camera.h"
+@@ -422,6 +424,21 @@
+ MAC_ADDRESS(0x08f5a0, 0x1578)  // ret 0x1c + caller arg order/call set
+ NewmapCell* advManager::moveHero(int direction, bool standEnd, type_point& triggerPoint, int* noMove, bool computerMove, int* foughtBattle, bool isRemoteMove)
+ {
++    if (Port::Fast::nativeUI()) {
++        const int id=g_currentPlayer->m_currHeroId;
++        const bool ok=Port::Fast::request(1,id,direction);
++        *noMove=!ok || id<0 || g_game->m_heroes[id].m_owner!=g_netLocalGamePos;
++        if(ok && id>=0 && g_game->m_heroes[id].m_owner==g_netLocalGamePos){
++            auto& h=g_game->m_heroes[id];
++            const int townId=g_game->getTownId(h.m_x,h.m_y,h.m_z);
++            if(townId>=0 && g_game->onSameTeam(g_game->m_towns[townId].m_owner,g_netLocalGamePos))
++                g_game->m_towns[townId].view(0);
++        }
++        *foughtBattle=0;
++        triggerPoint.m_x=-1;
++        return nullptr;
++    }
++
+     unsigned char becameBoat = 0;
+     hero* curr;
+     unsigned char enteredBoat;
+--- a/src/townmgr.cpp
++++ b/src/townmgr.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "prefs.h"
+ #include "text.h"
+ #include "va.h"
+@@ -4619,6 +4620,10 @@
+             normalDialog(g_generalText->GetText(GENERAL_TEXT_GRAIL_HOME_PROMPT), 2, -1, -1, -1, 0, -1, 0,
+                          -1, 0, -1, 0);
+             if (g_windowManager->m_dialogReturn == DIALOG_RETURN_ACCEPT) {
++                if (Port::Fast::nativeUI()) {
++                    if (Port::Fast::request(2,m_townToView->m_id,HOLY_GRAIL_ID)) buildObj(HOLY_GRAIL_ID);
++                    return;
++                }
+                 townHero->removeArtifact(ARTIFACT_HOLY_GRAIL);
+                 buildObj(HOLY_GRAIL_ID);
+                 if (g_game->m_mapHeader.m_victoryCondition.checkForGrailBuildingWin())
+@@ -4773,6 +4778,12 @@
+             if (code >= 0 && code <= DWELLING_6_UPG_ID)
+                 code = static_cast<TTownScreenWindow*>(m_townWindow)
+                            ->m_zBuffer[msg.m_mouseY * 800 + msg.m_mouseX] - 1;
++            if (Port::Fast::nativeUI() && !rclick && code>=0 && code<=DWELLING_6_UPG_ID
++                && !(code>=DWELLING_0_ID) && !(code>=CASTLE_FORT_ID && code<=CASTLE_CASTLE_ID)
++                && !(code>=HALL_VILLAGE_ID && code<=HALL_CAPITOL_ID) && code!=TAVERN_ID
++                && code!=HORDE_ID && code!=HORDE_UPG_ID && code!=HORDE_2_ID && code!=HORDE_2_UPG_ID) {
++                Port::Fast::unavailable();return 0;
++            }
+             switch (code) {
+             case DWELLING_0_ID:
+             case DWELLING_1_ID:
+@@ -5364,12 +5375,14 @@
+             Port::HD::recruitAll(m_townToView, GetKeyState(VK_MENU)<0, GetKeyState(VK_CONTROL)<0);
+             redrawTownScreen(); break;
+         case 0x30: // B: marketplace.
++            if (Port::Fast::nativeUI()) { Port::Fast::unavailable(); break; }
+             if (m_townToView->hasBuilding(MARKETPLACE_ID,true)) { doMarketplace(); redrawTownScreen(); }
+             break;
+         case 0x22: { // G: thieves' guild.
+             TThievesGuildWindow guild(-1); guild.doModal(0); redrawTownScreen(); break;
+         }
+         case KEYCODE_F10:
++            if (Port::Fast::nativeUI()) { Port::Fast::unavailable(); break; }
+             if (m_garrisonStrip && m_heroStrip && m_garrisonStrip->m_group && m_heroStrip->m_group
+                 && m_garrisonStrip->m_owner == g_netLocalGamePos && m_heroStrip->m_owner == g_netLocalGamePos
+                 && (!m_garrisonStrip->m_thisHero || m_heroStrip->m_group->hasCreatures())
+@@ -5425,6 +5438,7 @@
+ void townManager::doCommand(int inCommand, unsigned char isGarrison,
+                             type_garrison_base_window* garrisonWindow)
+ {
++    if (Port::Fast::nativeUI() && inCommand!=TOWN_COMMAND_VIEW_HERO) { Port::Fast::unavailable(); return; }
+     strip* quickStrip = (inCommand == TOWN_COMMAND_SELECT_SLOT) ? m_currStrip : m_destStrip;
+     int quickSlot = (inCommand == TOWN_COMMAND_SELECT_SLOT) ? m_currIndex : m_destIndex;
+     if (inCommand >= TOWN_COMMAND_SELECT_SLOT && inCommand <= TOWN_COMMAND_SPLIT_ARMY
+@@ -6022,9 +6036,14 @@
+         }
+         window->doModal(0);
+         if (g_windowManager->m_dialogReturn == TBuyBuildWindow::BUY_BUTTON_ID) {
+-            m_objToBuild = buildingId;
+-            for (i = 0; i < numResources; i++)
+-                g_currentPlayer->m_resources[resources[i]] -= amounts[i];
++            if (Port::Fast::nativeUI()) {
++                if (Port::Fast::request(2,m_townToView->m_id,buildingId)) m_objToBuild=buildingId;
++                else g_windowManager->m_dialogReturn=TBuyBuildWindow::CANCEL_BUTTON_ID;
++            } else {
++                m_objToBuild = buildingId;
++                for (i = 0; i < numResources; i++)
++                    g_currentPlayer->m_resources[resources[i]] -= amounts[i];
++            }
+         }
+     }
+ 
+@@ -6160,12 +6179,14 @@
+ MAC_ADDRESS(0x1d3ddc, 0x5e8)  // linkorder(dc row after CycleOutline) + arity(ret 4) + BuildBuilding/CycleOutline edges
+ void townManager::buildObj(int buildingId)
+ {
+-    if (m_townToView->hasBuilding(buildingId, true))
++    if (m_townToView->hasBuilding(buildingId, true) && !Port::Fast::nativeUI())
+         return;
+ 
+     drawTown(1, 1, 0);
+ 
+-    type_building_id newBuilding = m_townToView->buildBuilding(buildingId, 1, 1);
++    type_building_id newBuilding = Port::Fast::nativeUI()
++        ? static_cast<type_building_id>(buildingId)
++        : m_townToView->buildBuilding(buildingId, 1, 1);
+ 
+     for (int j = 0; j < m_townObjectCount; j++) {
+         if (m_townToView->hasBuilding(m_townObjects[j]->m_objId, false)) {
+@@ -6755,7 +6776,9 @@
+     if (!doTavern())
+         return;
+ 
+-    m_townToView->hire(g_tavernHero, g_game->getLocalPlayerGamePos());
++    if (Port::Fast::nativeUI()) {
++        if (!Port::Fast::request(3,m_townToView->m_id,g_tavernHero->m_id)) return;
++    } else m_townToView->hire(g_tavernHero, g_game->getLocalPlayerGamePos());
+     redrawTownScreen();
+     g_windowManager->saveFizzleSourceX(0xf1, 0x1e3, 0x1ee, 0x40);
+ 
+@@ -6776,7 +6799,7 @@
+     m_heroStrip->drawIcons(0, CREATURE_NONE);
+     g_windowManager->fizzleForwardX(0xf1, 0x1e3, 0x1ee, 0x40, -1);
+     waitEndSample(sample, -1);
+-    m_townToView->applySpecialBuildingEffect(
++    if (!Port::Fast::nativeUI()) m_townToView->applySpecialBuildingEffect(
+         g_game->getHero(m_townToView->m_visitingHeroId));
+ }
+ 
+--- a/src/recruit.cpp
++++ b/src/recruit.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "text.h"
+ #include "va.h"
+ #include "includes.h"
+@@ -930,6 +931,12 @@
+                 if (m_numberToBuy == 0 && m_monType2 == CREATURE_NONE)
+                     return finishRecruitUnit(msg);
+ 
++                if (Port::Fast::nativeUI()) {
++                    Port::Fast::requestRecruit(m_currArmyGroup,m_numAvail,m_monsterType,m_numberToBuy);
++                    m_numberToBuy=0;
++                    return finishRecruitUnit(msg);
++                }
++
+                 if (akCreatureTypeTraits[m_monsterType].attributes
+                     & g_ctaSiegeWeapon) {
+                     if (m_thisHero->getNumberInBackpack(1) + m_numberToBuy
+--- a/src/advspells.cpp
++++ b/src/advspells.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "prefs.h"
+ #include "va.h"
+ #include "includes.h"
+@@ -77,6 +78,7 @@
+ MAC_ADDRESS(0x01d1a8, 0x1bc)  // linkorder + anchor-callee hero::Fly / get_spell_level
+ void advManager::castSpell(SpellID whichSpell)
+ {
++    if (Port::Fast::nativeUI()) { Port::Fast::unavailable(); return; }
+     hero* who = g_game->getCurrHero();
+     if (who == 0)
+         return;
+--- a/src/events.cpp
++++ b/src/events.cpp
+@@ -616,6 +616,7 @@
+ MAC_ADDRESS(0x0a9580, 0x400)  // dc-bracket forced, ret 0xc=p4
+ void advManager::doEventShipyard(NewmapCell* cell, type_point point, unsigned char humanPlayer)
+ {
++    if (Port::Fast::nativeUI()) { Port::Fast::unavailable(); return; }
+     mobilizeCurrHero(0, 0, 1);
+ 
+     if (!g_game->onSameTeam(cell->m_shipyardInfo.owner, g_netLocalGamePos))
+@@ -4892,6 +4893,7 @@
+ MAC_ADDRESS(0x0b7b28, 0x194)
+ void advManager::doEvent(NewmapCell* eventCell, type_point point)
+ {
++    if (Port::Fast::nativeUI()) { Port::Fast::unavailable(); return; }
+     hero* currentHero = g_game->getCurrHero();
+ 
+     reseed(0, 0);
+@@ -5019,7 +5021,7 @@
+         }
+         if (humanPlayer)
+             thisTown->view(0);
+-        else
++        else if (!Port::Fast::executing() || !g_game->isHuman(g_netLocalGamePos))
+             aiEnterTown(currentHero, thisTown);
+     } else if (!thisTown->getArmy().hasCreatures()
+                && (thisTown->m_visitingHeroId < 0
+@@ -5046,7 +5048,7 @@
+         }
+         if (humanPlayer)
+             thisTown->view(0);
+-        else
++        else if (!Port::Fast::executing() || !g_game->isHuman(g_netLocalGamePos))
+             aiEnterTown(currentHero, thisTown);
+     } else {
+         hero* defender;
+--- a/src/hero.cpp
++++ b/src/hero.cpp
+@@ -1,3 +1,4 @@
++#include "fast_game.h"
+ #include "text.h"
+ #include "va.h"
+ #include "hd_army.h"
+@@ -4218,6 +4219,7 @@
+ MAC_ADDRESS(0x102330, 0x27c)
+ int heroView(int heroID, int noDismiss, int alreadyFaded, unsigned char quickView)
+ {
++    Port::Fast::ReadOnly readOnly(Port::Fast::nativeUI());
+     g_heroScreenNoDismiss = noDismiss;
+     g_heroScreenHeroId = heroID;
+     g_heroScreenDraggedArtifact.m_artifactId = ARTIFACT_NONE;

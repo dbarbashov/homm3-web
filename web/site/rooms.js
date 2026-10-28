@@ -311,7 +311,7 @@
     if(Array.from(text).length>300){$('chat-error').textContent='Не больше 300 символов';return;}
     try{send({type:'chat',text});pendingChat=text;updateChatButton();}catch(e){$('chat-error').textContent=e.message;}
   };
-  for(const event of ['keydown','keyup','keypress'])window.addEventListener(event,e=>{if(e.target.closest('#fast-panel'))return;if(e.target.closest('#tavern,dialog') || e.target.matches('input,textarea,select,button,a'))e.stopImmediatePropagation();},true);
+  for(const event of ['keydown','keyup','keypress'])window.addEventListener(event,e=>{if(e.target.closest('#tavern,dialog') || e.target.matches('input,textarea,select,button,a'))e.stopImmediatePropagation();},true);
   setInterval(()=>{if(socket?.readyState===WebSocket.OPEN)send({type:'ping'});},15000);
   setInterval(()=>{if(!tavern.hidden && view==='browser')refresh();},5000);
   window.homm3FastTransport={

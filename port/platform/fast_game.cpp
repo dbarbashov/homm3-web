@@ -1,5 +1,5 @@
 // Opt-in concurrent adventure controller. One original engine owns the world;
-// native windows are projections, browser controls submit authenticated intents.
+// original windows submit authenticated intents through the transport bridge.
 #include "fast_game.h"
 #include "game.h"
 #include "hero.h"
@@ -18,6 +18,12 @@
 #include "inputmgr.h"
 #include "winmgr.h"
 #include "message.h"
+#include "hd_view.h"
+#include "townmgr.h"
+#include "window.h"
+#include "bitmap16.h"
+#include "widget.h"
+extern Bitmap16Bit g_initWin;
 #include <sstream>
 #include <vector>
 #include <stdexcept>
@@ -28,11 +34,11 @@
 #endif
 namespace Port { namespace Fast {
 namespace {
-int localSlot=-1;
-bool authority=false,failed=false;
+int localSlot=-1,readOnlyDepth=0;
+bool authority=false,failed=false,imported=false;
 int selectedHero=-1,selectedTown=-1;
 type_point camera;
-struct Running { Running(){state().running=true;} ~Running(){state().running=false;} };
+struct Running { Running(){state().running=true;state().drawing=false;} ~Running(){state().running=false;} };
 int day(){return (g_game->m_month-1)*28+(g_game->m_week-1)*7+g_game->m_day;}
 void require(bool condition,const char* text){if(!condition)throw std::runtime_error(text);}
 std::string quote(const char* s){
@@ -54,6 +60,8 @@ void context(int slot){
 void demobilize(){g_advManager->demobilizeCurrHero(false,false);}
 void restoreView(bool center=false){
     context(localSlot);
+    g_game->m_players[localSlot].m_isLocal=readOnlyDepth?0:1;
+    g_thisNetGotAdventureControl=1;
     auto& p=g_game->m_players[localSlot];
     const bool townSelected=selectedHero<0 && selectedTown>=0 && selectedTown<int(g_game->m_towns.size()) && g_game->m_towns[selectedTown].m_owner==localSlot;
     if(!townSelected && (selectedHero<0 || selectedHero>=game::HERO_COUNT || g_game->m_heroes[selectedHero].m_owner!=localSlot)){
@@ -63,12 +71,23 @@ void restoreView(bool center=false){
         selectedTown=p.m_numTowns?int(p.m_townIds[0]):-1;
     p.m_currHeroId=static_cast<HeroId>(selectedHero);p.m_currTownId=selectedHero<0?selectedTown:-1;
     g_advManager->m_curHeroMobile=0;
+    if(selectedHero>=0)g_advManager->setHeroContext(selectedHero,0,false,false);
     if(center && selectedHero>=0){auto& h=g_game->m_heroes[selectedHero];camera=type_point(h.m_x-9,h.m_y-8,h.m_z);}
     else if(center && selectedTown>=0){auto& t=g_game->m_towns[selectedTown];camera=type_point(t.m_mapX-9,t.m_mapY-8,t.m_mapZ);}
     camera.m_x=std::max(-9,std::min(g_mapWidth-10,int(camera.m_x)));
     camera.m_y=std::max(-8,std::min(g_mapHeight-9,int(camera.m_y)));
     g_advManager->m_radarOrigin=camera;
-    g_completeDrawEnabled=1;
+    g_completeDrawEnabled=1;g_completeDrawAllCells=0;
+    g_advManager->enableButtons();
+    g_advManager->m_advWindow->getWidget(TAdventureMapWindow::END_TURN_ID)->enable(!state().ready);
+    auto* current=selectedHero>=0?&g_game->m_heroes[selectedHero]:nullptr;
+    g_advManager->m_advWindow->updateSpellButton(current);
+    g_advManager->m_advWindow->updateSleepButton(current);
+    g_advManager->overrideBottomView(advManager::BOTTOM_VIEW_DEFAULT,0);
+    g_advManager->updBottomView(1,1,0);
+    g_advManager->reseed(0,0);
+    if(current && current->m_pathTargetX>=0)g_advManager->seedTo(current->getTarget());
+    g_advManager->forceNewHover();
     g_advManager->m_advWindow->updateHeroLocators(-1,1,1);
     g_advManager->m_advWindow->updateTownLocators(-1,1,1);
     g_advManager->m_advWindow->updateResourceDisplay(1,1);
@@ -128,7 +147,7 @@ void complete(int seq,bool ok,const char* error,bool snapshot){
     EM_ASM({const meta=JSON.parse(new TextDecoder('windows-1251').decode(HEAPU8.subarray($0,$0+$1)));const bytes=$2?HEAPU8.slice($3,$3+$4):null;window.homm3FastNative.complete(meta,bytes);},json.data(),json.size(),snapshot,bytes.data(),bytes.size());
 #endif
 }
-void fault(const char* error){failed=true;
+void fault(const char* error){failed=true;state().halted=true;
 #ifdef __EMSCRIPTEN__
     EM_ASM({window.homm3FastNative.fault(UTF8ToString($0));},error);
 #endif
@@ -232,27 +251,112 @@ void begin(){
     if(authority)for(int i=0;i<8 && !g_gameOver;++i)if(i!=firstActor&&!g_game->m_playerDisabled[i]&&g_game->isHuman(i)){
         context(i);g_game->checkForTimeEvent();g_game->checkForTownEvent();
     }
-    restoreView(true);
+    state().drawing=true;restoreView(true);
     EM_ASM({window.homm3FastNative.started($0,!!$1);},localSlot,authority);
 #endif
 }
-int adventureMain(message&){
+void tick(){
 #ifdef __EMSCRIPTEN__
-    if(!enabled()||executing()||failed)return MESSAGE_DISPATCH_CONSUME;
-    if(!EM_ASM_INT({return !!window.homm3FastNative && window.homm3FastNative.canRun!==false;}))return MESSAGE_DISPATCH_CONSUME;
+    if(!enabled()||executing()||failed)return;
+    state().ready=EM_ASM_INT({return !!window.homm3FastState?.ready;});
+    static int displayedReady=-1;
+    if(!Port::HD::adventureVisible())displayedReady=-1;
+    else if(displayedReady!=int(state().ready)){
+        displayedReady=state().ready;
+        auto* win=g_advManager->m_advWindow;
+        auto* button=win->getWidget(TAdventureMapWindow::END_TURN_ID);
+        button->enable(!state().ready);
+        win->drawWindow(0,TAdventureMapWindow::END_TURN_ID,TAdventureMapWindow::END_TURN_ID);
+        g_windowManager->updateScreen(win->m_x+button->m_x,win->m_y+button->m_y,button->m_width,button->m_height);
+        if(state().ready)g_advManager->drawRolloverText(const_cast<char*>(waitingText()));
+    }
+
+    if(!EM_ASM_INT({return !!window.homm3FastNative && window.homm3FastNative.canRun!==false;}))return;
     int command[8]={};
-    if(!EM_ASM_INT({const c=window.homm3FastNative.take();if(!c)return 0;for(let i=0;i<8;++i)HEAP32[($0>>2)+i]=c[i]||0;return 1;},command))return MESSAGE_DISPATCH_CONSUME;
+    if(!EM_ASM_INT({const c=window.homm3FastNative.take();if(!c)return 0;for(let i=0;i<8;++i)HEAP32[($0>>2)+i]=c[i]||0;return 1;},command))return;
+    const bool adventure=Port::HD::adventureVisible();
+    selectedHero=g_game->m_players[localSlot].m_currHeroId;
+    selectedTown=g_game->m_players[localSlot].m_currTownId;
+    camera=g_advManager->m_radarOrigin;
+    const auto bottomDeadline=g_advManager->m_bottomViewDeadline;
+    const auto allCells=g_completeDrawAllCells;
+    const int dialogResult=g_windowManager->m_dialogReturn;
+    const int advCommand=g_advManager->m_advCommand;
+    town* displayedTown=g_townManager->m_townToView;
+    const size_t townCount=g_game->m_towns.size();
+    Bitmap16Bit savedCanvas(g_initWin.GetWidth(),g_initWin.GetHeight());
+    g_initWin.Draw(0,0,g_initWin.GetWidth(),g_initWin.GetHeight(),&savedCanvas,0,0,false);
     Running running;bool ok=true;std::string error;
-    try{demobilize();apply(command);}catch(const std::exception& e){
+    try{
+        demobilize();apply(command);
+        // Native town/recruit windows retain pointers into the fixed town pool.
+        // A match never adds/removes towns; reject incompatible world imports.
+        require(g_game->m_towns.size()==townCount,"Canonical town layout changed");
+    }catch(const std::exception& e){
         ok=false;error=e.what();
-        if(command[0]==6){fault(error.c_str());return MESSAGE_DISPATCH_CONSUME;}
+        if(command[0]==6){fault(error.c_str());return;}
     }
     try{
-        demobilize();restoreView();
+        demobilize();
+        savedCanvas.Draw(0,0,savedCanvas.GetWidth(),savedCanvas.GetHeight(),&g_initWin,0,0,false);
+        state().drawing=true;
+        g_completeDrawAllCells=allCells;
+        g_advManager->m_bottomViewDeadline=bottomDeadline;
+        if(adventure)restoreView(command[0]==6 && !imported);
+        else {
+            context(localSlot);g_game->m_players[localSlot].m_isLocal=readOnlyDepth?0:1;
+            g_thisNetGotAdventureControl=1;
+            auto& player=g_game->m_players[localSlot];
+            player.m_currHeroId=static_cast<HeroId>(selectedHero);player.m_currTownId=selectedTown;
+            g_advManager->m_radarOrigin=camera;
+            g_completeDrawEnabled=1;
+        }
+        g_townManager->m_townToView=displayedTown;
+        g_advManager->m_advCommand=advCommand;
+        g_windowManager->m_dialogReturn=dialogResult;
         bool snapshot=authority && (command[0]<=5||command[0]==10);
         complete(command[6],ok,error.c_str(),snapshot);
+        if(command[0]==6)imported=true;
     }catch(const std::exception& e){fault(e.what());}
 #endif
-    return MESSAGE_DISPATCH_CONSUME;
 }
+bool request(int op,int id,int a,int b){
+#ifdef __EMSCRIPTEN__
+    if(!nativeUI()||failed||readOnlyDepth)return false;
+    const int ticket=EM_ASM_INT({return window.homm3FastNative.request($0,$1,$2,$3);},op,id,a,b);
+    if(!ticket){unavailable();return false;}
+    struct Waiting { Waiting(){state().waiting=true;} ~Waiting(){state().waiting=false;} } waiting;
+    const unsigned long started=GameTime::get();
+    int result=0;
+    while(!failed && !(result=EM_ASM_INT({return window.homm3FastNative.result($0);},ticket))){
+        tick();
+        if(GameTime::elapsedSince(started)>30000){fault("Command confirmation timed out");return false;}
+        emscripten_sleep(8);
+    }
+    g_inputManager->flush();
+    if(result!=1)unavailable();
+    return result==1;
+#else
+    return false;
+#endif
+}
+void readOnlyView(bool enter){
+    readOnlyDepth+=enter?1:-1;
+    if(localSlot>=0)g_game->m_players[localSlot].m_isLocal=readOnlyDepth?0:1;
+}
+const char* waitingText(){return "\xd5\xee\xe4\x20\xe7\xe0\xe2\xe5\xf0\xf8\xb8\xed\x2e\x20\xce\xe6\xe8\xe4\xe0\xe5\xec\x20\xee\xf1\xf2\xe0\xeb\xfc\xed\xfb\xf5\x20\xe8\xe3\xf0\xee\xea\xee\xe2\x2e";}
+void unavailable(){
+    if(state().ready){normalDialog(waitingText(),1,-1,-1,-1,0,-1,0,-1,0,-1,0);return;}
+    if(!failed)normalDialog("\xdd\xf2\xee\x20\xe4\xe5\xe9\xf1\xf2\xe2\xe8\xe5\x20\xef\xee\xea\xe0\x20\xed\xe5\xe4\xee\xf1\xf2\xf3\xef\xed\xee\x20\xe2\x20\xe1\xfb\xf1\xf2\xf0\xee\xec\x20\xef\xf0\xee\xf2\xee\xf2\xe8\xef\xe5\x2c\x20\xeb\xe8\xe1\xee\x20\xf3\xe6\xe5\x20\xe8\xe7\xec\xe5\xed\xe8\xeb\xee\xf1\xfc\x20\xf1\xee\xf1\xf2\xee\xff\xed\xe8\xe5\x20\xe8\xe3\xf0\xfb\x2e\x20\xc7\xe0\xea\xf0\xee\xe9\xf2\xe5\x20\xee\xea\xed\xee\x20\xe8\x20\xef\xee\xe2\xf2\xee\xf0\xe8\xf2\xe5\x20\xef\xee\xf1\xeb\xe5\x20\xee\xe1\xed\xee\xe2\xeb\xe5\xed\xe8\xff\x2e",1,-1,-1,-1,0,-1,0,-1,0,-1,0);
+}
+bool requestRecruit(armyGroup* army,short* available,int creature,int count){
+    for(auto& t:g_game->m_towns) {
+        if(t.m_owner!=localSlot || &t.getArmy()!=army)continue;
+        for(int slot=0;slot<14;++slot)if(available==&t.m_population[slot] && g_dwellingType[t.m_type][slot]==creature)
+            return request(4,t.m_id,slot,count);
+    }
+    return false;
+}
+int adventureMain(message&){tick();return MESSAGE_DISPATCH_CONSUME;}
+
 } }
