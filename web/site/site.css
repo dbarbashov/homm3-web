@@ -17,3 +17,6 @@ input::placeholder{color:#b6a180;opacity:1}select option{background:var(--well)}
 @media(pointer:coarse){.tavern-heading button::after,.panel-title button::after,.chat-form button::after{content:"";position:absolute;inset:-4px}}
 #create-title,#room-title{font-family:HeroesTitle,Georgia,serif;font-size:28px;color:#f5df9d}
 @media(max-height:480px) and (min-width:600px){.entry{width:min(620px,100%);display:grid;grid-template-columns:144px minmax(0,1fr);justify-items:center;column-gap:28px;row-gap:12px}.entry h1{width:144px;grid-row:1/4}.entry>.button,.entry>.report-link,.entry>.github-link{grid-column:2}}
+
+.chat-form button svg{display:block;flex:none;pointer-events:none}
+#chat-send-countdown{font:14px/1 Georgia,serif}

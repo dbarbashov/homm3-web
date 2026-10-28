@@ -7,7 +7,9 @@
   function updateChatButton() {
     const seconds = Math.ceil((chatBlockedUntil - Date.now()) / 1000);
     $('chat-send').disabled = !room || socket?.readyState !== WebSocket.OPEN || pendingChat !== null || seconds > 0;
-    $('chat-send').textContent = seconds > 0 ? `${seconds}с` : '↵';
+    $('chat-send-icon').toggleAttribute('hidden', seconds > 0);
+    $('chat-send-countdown').hidden = seconds <= 0;
+    $('chat-send-countdown').textContent = seconds > 0 ? `${seconds}с` : '';
     clearTimeout(chatTimer);
     if (seconds > 0) chatTimer = setTimeout(updateChatButton, 250);
   }
