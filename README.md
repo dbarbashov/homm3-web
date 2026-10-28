@@ -99,6 +99,18 @@ This produces an ignored `web/site/fonts.css`. Without it the UI uses system fon
 The font conversion assumes the Cyrillic CP1251 edition; see `--encoding` for
 other editions. Generated original glyphs are not licensed by this repository.
 
+The browser panels can also use the original dialog texture, red-and-gold frame
+and button surfaces from that installation:
+
+```sh
+python3 -m pip install Pillow
+python3 scripts/build-ui-skin.py
+```
+
+This creates an ignored `web/site/skin.css` with embedded images. Generated
+artwork stays outside Git; without it the interface uses its CSS fallback.
+The deployment bundle includes both optional stylesheets when present.
+
 ### Multiplayer development
 
 The room relay lives in a **separate private repository**. It is deliberately not

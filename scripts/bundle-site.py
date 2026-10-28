@@ -14,12 +14,12 @@ with tarfile.open(output / 'site.tar.gz', 'w:gz') as tar:
         if not path.is_file():
             raise FileNotFoundError(path)
         tar.add(path, arcname='web/' + name)
-    fonts = root / 'web/site/fonts.css'
-    if fonts.is_file():
-        tar.add(fonts, arcname='web/site/fonts.css')
-    else:
-        empty = output / 'fonts.css'; empty.write_text('/* Optional locally generated UI fonts. */\n')
-        tar.add(empty, arcname='web/site/fonts.css')
+    for name in ['fonts.css', 'skin.css']:
+        generated = root / 'web/site' / name
+        if not generated.is_file():
+            generated = output / name
+            generated.write_text('/* Optional locally generated UI assets. */\n')
+        tar.add(generated, arcname='web/site/' + name)
     tar.add(root / '.local/ffmpeg-8.0.3.tar.xz', arcname='web/sources/ffmpeg-8.0.3.tar.xz')
     tar.add(root / 'licenses/ffmpeg-LGPL-2.1.txt', arcname='web/sources/ffmpeg-LGPL-2.1.txt')
     # Local development reports include screenshots and machine paths: keep them off the VPS.
