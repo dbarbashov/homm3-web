@@ -7,7 +7,7 @@ const fullGame = location.pathname.endsWith('/game.html');
 let catalog;
 let archives;
 let exited = false;
-let prepared = false, preparing = null, runtimeReady = false, running = false;
+let prepared = false, preparing = null, runtimeReady = false, running = false, filesystemCreated = false;
 const assetFetch = (...args) => (window.homm3Assets?.fetch || fetch)(...args);
 async function refreshCatalog() {
   const response = await assetFetch('/api/catalog');
@@ -37,6 +37,7 @@ window.Module = {
   onRuntimeInitialized: async () => {
     try {
       runtimeReady = true;
+      window.dispatchEvent(new Event('homm3-boot-ready'));
       await refreshCatalog();
       if(new URLSearchParams(location.search).get('play')==='1' && !location.hash) {
         await prepare(); runGame();
@@ -55,6 +56,7 @@ async function prepare() {
     const fingerprints = [];
     const { digest } = await import('/port/sha256.js');
     const dataDir = fullGame ? '/runtime/data' : '/data';
+    filesystemCreated = true;
     if (fullGame) {
       Module.FS.mkdir('/runtime');
       try {
@@ -104,15 +106,19 @@ async function prepare() {
     window.homm3Build = await digest(new TextEncoder().encode(fingerprints.sort().join('\n')));
     prepared = true; progress.hidden = true; status.textContent = 'Готово к запуску';
   })();
-  try { await preparing; } catch(error) { status.textContent = error.message; throw error; }
+  try { await preparing; } catch(error) {
+    if (!filesystemCreated) preparing = null;
+    else error.message = error.message.includes('Перезагрузите страницу') ? error.message : error.message + '. Перезагрузите страницу для повтора.';
+    status.textContent = error.message; throw error;
+  }
 }
 // Keep this name distinct from the generated Emscripten global run().
 function runGame(network=false) {
   if (!prepared || running) return;
-  running = true; document.querySelector('#launch-cover')?.setAttribute('hidden','');
+  running = true; window.dispatchEvent(new Event('homm3-running')); document.querySelector('#launch-cover')?.setAttribute('hidden','');
   Module.callMain(fullGame ? ['/runtime', ...(network ? ['--network'] : [])] : ['/data/']);
 }
-window.homm3Boot = { prepare, run: runGame, get running() { return running; } };
+window.homm3Boot = { prepare, run: runGame, get running() { return running; }, get ready() { return runtimeReady; } };
 start.addEventListener('click', async () => {
   if (exited) { location.reload(); return; }
   try { await prepare(); runGame(); } catch(error) { status.textContent = error.message; start.textContent = 'Перезагрузите страницу для повтора'; }
