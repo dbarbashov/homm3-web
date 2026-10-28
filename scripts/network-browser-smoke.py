@@ -46,6 +46,7 @@ with sync_playwright() as p:
         dump('adventure')
         for page in pages:page.wait_for_function('window.homm3PortDiagnostics?.screen === "adventure"')
         states=[page.evaluate('window.homm3GameState') for page in pages]
+        for page in pages:page.wait_for_function('Number(document.documentElement.dataset.playerColor)===window.homm3GameState.localPlayer')
         assert [x['localPlayer'] for x in states]==[0,1] and all(x['remote']==1 and x['humans']==2 for x in states)
         y=states[0]['y']
         b.locator('#canvas').press('ArrowDown');b.wait_for_timeout(700)
@@ -65,6 +66,7 @@ with sync_playwright() as p:
             b.locator('#canvas').press('Enter');b.wait_for_timeout(1000)
         b.wait_for_function('window.homm3GameState.hero>=0',timeout=10000)
         b.wait_for_function('window.homm3NetworkState.radarY>10');dump('guest-turn')
+        for page in pages:assert page.evaluate('Number(document.documentElement.dataset.playerColor)===window.homm3GameState.localPlayer'), 'Theme followed the remote turn'
         guest=b.evaluate('window.homm3GameState');b.locator('#canvas').press('ArrowDown');b.wait_for_timeout(2000);dump('guest-after-input')
         for page in pages:page.wait_for_function('(y)=>window.homm3GameState.y===y',arg=guest['y']+1,timeout=20000)
         dump('guest-movement-synced')

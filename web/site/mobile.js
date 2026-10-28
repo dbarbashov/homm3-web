@@ -18,10 +18,37 @@
       document.documentElement.style.setProperty('--game-'+name,value+'px');
     render();
   }
+  // Match game::getLocalPlayerGamePos(): remote opponents/AI do not own our UI.
+  let themeSnapshot;
+  function syncPlayerTheme() {
+    const root=document.documentElement,state=window.homm3GameState;
+    const screen=window.homm3PortDiagnostics?.screen;
+    if(!window.homm3Boot?.running || ['main','new','load','closed'].includes(screen)) {
+      delete root.dataset.playerColor;themeSnapshot=state;return;
+    }
+    if(!state || state===themeSnapshot)return;
+    themeSnapshot=state;
+    let color=state.localPlayer;
+    if(!state.remote && state.humans>1) {
+      const slot=window.homm3NetworkState?.turnSlot;
+      color=window.homm3HeroStates?.some(p=>p.player===slot && p.human)
+        ? slot : window.homm3NetworkState?.aiOwner;
+    }
+    if(!Number.isInteger(color) || color<0 || color>7)return;
+    if(root.dataset.playerColor!==String(color)) {
+      root.dataset.playerColor=String(color);
+      window.dispatchEvent(new Event('homm3-player-color'));
+    }
+  }
+  // The existing engine snapshot is refreshed every 250 ms; no extra WASM calls.
+  setInterval(syncPlayerTheme,250);
+  window.addEventListener('homm3-ready',syncPlayerTheme);
+  window.addEventListener('homm3-exit',syncPlayerTheme);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncPlayerTheme();});
   function closeControls(){ $('view-actions').hidden=true;$('view-toggle').setAttribute('aria-expanded','false'); }
   function menuPage(settings=false){$('menu-main').hidden=settings;$('menu-settings').hidden=!settings;}
   $('view-toggle').onclick=()=>{
-    const open=$('view-actions').hidden;menuPage();window.homm3Lobby?.close();
+    syncPlayerTheme();const open=$('view-actions').hidden;menuPage();window.homm3Lobby?.close();
     $('view-actions').hidden=!open;$('view-toggle').setAttribute('aria-expanded',String(open));
   };
   $('view-resume').onclick=()=>{closeControls();canvas.focus({preventScroll:true});};
