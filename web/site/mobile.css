@@ -39,3 +39,7 @@ html:has(.game-immersive),body.game-immersive{position:fixed;inset:0;overflow:hi
 }
 
 #extra-toggle::before{content:"▸";margin-right:6px}#extra-toggle[aria-expanded=true]::before{content:"▾"}
+
+#launch-cover h1{line-height:0;flex:none}
+.launch-crest{display:block;width:clamp(120px,22vh,192px);max-width:45vw;height:auto}
+@media(max-height:480px){.launch-crest{width:72px}}
