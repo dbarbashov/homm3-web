@@ -127,9 +127,7 @@ folder is shared.
 ## Checks
 
 ```sh
-# Also build the optional map viewer/parser used by the unit tests:
-rustup target add wasm32-unknown-unknown
-npm run build
+# Unit tests (no game assets or WASM build required):
 npm test
 
 # Browser integration (requires your assets and a running local server):
@@ -140,8 +138,7 @@ npm run test:site       # requires the optional relay
 npm run test:network    # two independent clients; requires relay and matching assets
 ```
 
-Rust is only needed for the optional map viewer/parser and private relay; the game
-engine itself is C++. Browser test output goes to ignored `test-results/`.
+Rust is only needed for the private room relay; the game engine is C++. Browser test output goes to ignored `test-results/`.
 
 ## Source layout
 
@@ -152,7 +149,6 @@ engine itself is C++. Browser test output goes to ignored `test-results/`.
 | `web/site/` | Tavern, resources adapter, touch controls and styles |
 | `lib/`, `server.mjs` | Local installation reader and development server |
 | `scripts/`, `tests/` | Build tools and regression checks |
-| `engine/`, `web/viewer.html` | Optional earlier Rust/WASM map viewer |
 | `upstream.lock.json` | Exact upstream source revision |
 
 ## Saves and controls

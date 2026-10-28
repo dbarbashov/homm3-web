@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
-import { gunzipSync } from 'node:zlib';
 import { openInstallation, readAsset } from './lib/assets.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +19,7 @@ const bindAddress = process.env.HOST || '0.0.0.0';
 const lanAddresses = Object.values(networkInterfaces()).flat().filter(n => n.family === 'IPv4' && !n.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(n.address)).map(n => n.address);
 const allowedHosts = new Set(['127.0.0.1', 'localhost', ...lanAddresses, hostname().toLowerCase()]);
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
-const staticFiles = new Set(['viewer.html', 'site/site.css', 'site/fonts.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/report-bug.js', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/rooms.js', 'site/status.html', 'site/credits.html', 'index.html', 'app.js', 'engine.js', 'renderer.js', 'style.css', 'engine.wasm', 'status.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
+const staticFiles = new Set(['site/site.css', 'site/fonts.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/report-bug.js', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/rooms.js', 'site/status.html', 'site/credits.html', 'index.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
 
 const server = http.createServer(async (req, res) => {
   const send = (status, body, type = 'application/octet-stream') => {
@@ -64,10 +63,6 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' });
         await pipeline(createReadStream(file), res);
         return;
-      }
-      if (route === '/api/map' && installation.maps.includes(name)) {
-        const data = await readFile(path.join(installation.root, 'Maps', name));
-        return send(200, gunzipSync(data, { maxOutputLength: 128 * 1024 * 1024 }));
       }
       if (route === '/api/music' && installation.music.includes(name)) return send(200, await readFile(path.join(installation.root, 'Mp3', name)), 'audio/mpeg');
       return send(404, 'Not found');

@@ -3,15 +3,9 @@
   "branch": "decomp-complete-4.0",
   "commit": "e12906accf96c2662b1abadbc49ddc111991bf21",
   "license": "CC0-1.0",
-  "retailExecutable": {
-    "size": 2732032,
-    "sha256": "057c9d88e7206f6669a4615de2c6e02ab6c4e2d570a9e2badf07fe0bd6247274"
-  },
   "components": [
     "src (portable subset in port/sources.json)",
-    "include",
-    "tools/homm3-map",
-    "tools/homm3-def"
+    "include"
   ],
   "reference": [
     "src/advmgr.cpp",
