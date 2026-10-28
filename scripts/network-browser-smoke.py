@@ -2,6 +2,7 @@
 from pathlib import Path
 import json, time, os
 from playwright.sync_api import sync_playwright
+from browser_audio import use_silent_audio
 BASE=os.environ.get('SITE_URL','http://127.0.0.1:8783')
 ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'test-results/network';OUT.mkdir(parents=True,exist_ok=True);(OUT/'results.json').unlink(missing_ok=True)
 with sync_playwright() as p:
@@ -9,6 +10,7 @@ with sync_playwright() as p:
     credentials=json.loads(Path(os.environ['SITE_ACCESS_FILE']).read_text()) if os.environ.get('SITE_ACCESS_FILE') else None
     options={'http_credentials':{k:credentials[k] for k in ('username','password')}} if credentials else {}
     contexts=[browser.new_context(viewport={'width':1360,'height':1000},**options) for _ in range(2)]
+    for context in contexts: use_silent_audio(context)
     pages=[c.new_page() for c in contexts];logs=[[],[]];errors=[[],[]]
     for i,page in enumerate(pages):
         page.on('console',lambda m,i=i:logs[i].append(m.text))
@@ -24,14 +26,14 @@ with sync_playwright() as p:
         for i,page in enumerate(pages):
             page.goto(BASE+'/port/game.html?hd=0#multiplayer')
             page.wait_for_function('!document.querySelector("#start").disabled',timeout=60000)
-            page.locator('#player-name').fill(['Host','Guest'][i])
-        title='Browser integration '+str(time.time_ns());a.locator('#show-create').click();a.locator('#room-name').fill(title);a.locator('#capacity').select_option('2');a.locator('#create-submit').click()
+
+        title='Browser integration '+str(time.time_ns());a.locator('#show-create').click();a.locator('#player-name').fill('Host');a.locator('#identity-submit').click();a.locator('#room-name').fill(title);a.locator('#capacity').select_option('2');a.locator('#create-submit').click()
         a.wait_for_function('window.homm3Room?.players.length === 1')
-        b.locator('#refresh-rooms').click();b.locator('.room-card').filter(has_text=title).click();b.locator('#join-selected').click()
+        b.locator('#refresh-rooms').click();b.get_by_role('button',name='Войти: '+title,exact=True).click();b.locator('#player-name').fill('Guest');b.locator('#identity-submit').click()
         a.wait_for_function('window.homm3Room?.players.length === 2')
-        b.locator('#chat-input').fill('Привет! <b>Проверяем чат</b>');b.locator('#chat-send').click()
+        b.locator('#room-chat').click();b.locator('#chat-input').fill('Привет! <b>Проверяем чат</b>');b.locator('#chat-send').click()
         a.wait_for_function('document.querySelector("#chat-log").textContent.includes("Привет!")')
-        a.locator('#ready').click();b.locator('#ready').click()
+        b.locator('#chat-back').click();a.locator('#ready').click();b.locator('#ready').click()
         a.wait_for_function('window.homm3Room?.players.every(p=>p.ready)',timeout=120000)
         dump('lobby-ready')
         a.locator('#launch-room').click()
@@ -51,7 +53,7 @@ with sync_playwright() as p:
         a.locator('#canvas').press('ArrowDown')
         for page in pages:page.wait_for_function('(y)=>window.homm3GameState.y===y',arg=y+1,timeout=20000)
         dump('host-movement-synced')
-        b.locator('#open-tavern').click();b.locator('#chat-input').fill('Ход героя вижу. Передавай ход!');b.locator('#chat-send').click()
+        b.locator('#view-toggle').click();b.locator('#view-tavern').click();b.locator('#room-chat').click();b.locator('#chat-input').fill('Ход героя вижу. Передавай ход!');b.locator('#chat-send').click()
         a.wait_for_function('document.querySelector("#chat-log").textContent.includes("Передавай ход")');b.locator('#close-tavern').click()
         a.wait_for_function('!window.homm3GameState.moving');a.locator('#canvas').press('e');a.wait_for_timeout(700);a.locator('#canvas').press('Enter');b.wait_for_timeout(1500)
         for _ in range(20):

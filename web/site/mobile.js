@@ -18,14 +18,15 @@
       document.documentElement.style.setProperty('--game-'+name,value+'px');
     render();
   }
-  const compactControls=matchMedia('(pointer:coarse) and (max-width:1000px)');
-  function setExtraControls(open){ $('extra-commands').hidden=!open;$('extra-toggle').setAttribute('aria-expanded',String(open)); }
-  function syncControlGroups(){ $('extra-toggle').hidden=!compactControls.matches;setExtraControls(!compactControls.matches); }
-  $('extra-toggle').onclick=()=>setExtraControls($('extra-commands').hidden);
-  compactControls.addEventListener('change',syncControlGroups);
-  syncControlGroups();
   function closeControls(){ $('view-actions').hidden=true;$('view-toggle').setAttribute('aria-expanded','false'); }
-  $('view-toggle').onclick=()=>{const open=$('view-actions').hidden;$('view-actions').hidden=!open;$('view-toggle').setAttribute('aria-expanded',String(open));};
+  function menuPage(settings=false){$('menu-main').hidden=settings;$('menu-settings').hidden=!settings;}
+  $('view-toggle').onclick=()=>{
+    const open=$('view-actions').hidden;menuPage();window.homm3Lobby?.close();
+    $('view-actions').hidden=!open;$('view-toggle').setAttribute('aria-expanded',String(open));
+  };
+  $('view-resume').onclick=()=>{closeControls();canvas.focus({preventScroll:true});};
+  $('view-settings').onclick=()=>menuPage(true);
+  $('settings-back').onclick=()=>menuPage(false);
   let smoothCamera=!matchMedia('(prefers-reduced-motion: reduce)').matches;
   try { const saved=localStorage.getItem('homm3.smoothCamera');if(saved!==null)smoothCamera=saved==='true'; } catch {}
   function setSmoothCamera(value) {
@@ -46,22 +47,14 @@
     }catch{/* iOS uses the complete available viewport; Home Screen mode hides browser chrome. */}
     resize();
   };
-  $('view-exit').onclick=()=>{location.href='/';};
+  $('view-exit').onclick=()=>{
+    if(window.homm3Boot.running){$('exit-dialog').showModal();$('exit-cancel').focus();}
+    else location.href='/';
+  };
+  $('exit-cancel').onclick=()=>$('exit-dialog').close();
+  $('exit-confirm').onclick=()=>{location.href='/';};
   document.addEventListener('fullscreenchange',resize);
-  $('view-tavern').onclick=()=>{closeControls();$('open-tavern').click();};
-  for(const button of document.querySelectorAll('[data-game-key]'))button.onclick=()=>{
-    const key=button.dataset.gameKey,keyCode={Enter:13,Escape:27,e:69,r:82,b:66,g:71,F10:121,Space:32}[key];
-    if(!window.homm3Boot.running)return;
-    closeControls();canvas.focus({preventScroll:true});
-    for(const type of ['keydown','keyup'])canvas.dispatchEvent(new KeyboardEvent(type,{key,code:key.length===1?'Key'+key.toUpperCase():key,keyCode,which:keyCode,bubbles:true,cancelable:true}));
-  };
-  for(const button of document.querySelectorAll('[data-army-action]'))button.onclick=()=>{
-    const action=Number(button.dataset.armyAction);
-    window.homm3ArmyAction=window.homm3ArmyAction===action?0:action;
-    for(const item of document.querySelectorAll('[data-army-action]'))item.setAttribute('aria-pressed',String(Number(item.dataset.armyAction)===window.homm3ArmyAction));
-    $('view-toggle').textContent=window.homm3ArmyAction?'Отряды: '+button.textContent:'Меню';
-    closeControls();
-  };
+  $('view-tavern').onclick=()=>{closeControls();window.homm3Lobby?.open();};
 
   new ResizeObserver(render).observe(stage);
   window.addEventListener('resize',resize);

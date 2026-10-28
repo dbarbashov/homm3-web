@@ -38,6 +38,43 @@ def bitmap(data, player_palette=None):
     raise ValueError('Unsupported or truncated game bitmap')
 
 
+def menu_sprites(data, player_palette):
+    """Render system-options button states from the original IAM009 DEF."""
+    kind, width, height, groups = struct.unpack_from('<4I', data)
+    if (width, height, groups) != (32, 32, 1):
+        raise ValueError('Unexpected system-options sprite')
+    palette = bytearray(data[16:784])
+    palette[224 * 3:] = player_palette
+    count = struct.unpack_from('<I', data, 788)[0]
+    frames = []
+    for index in range(2):
+        offset = struct.unpack_from('<I', data, 800 + count * 13 + index * 4)[0]
+        size, fmt, full_w, full_h, w, h, left, top = struct.unpack_from('<8I', data, offset)
+        if fmt != 1 or (w, h, left, top) != (32, 32, 0, 0):
+            raise ValueError('Unexpected system-options frame encoding')
+        payload = offset + 32
+        pixels = bytearray()
+        for row in range(h):
+            cursor = payload + struct.unpack_from('<I', data, payload + row * 4)[0]
+            line = bytearray()
+            while len(line) < w:
+                code, length = data[cursor:cursor + 2]
+                cursor += 2
+                length += 1
+                if code == 255:
+                    line.extend(data[cursor:cursor + length])
+                    cursor += length
+                else:
+                    line.extend(bytes([code]) * length)
+            if len(line) != w:
+                raise ValueError('Invalid system-options sprite row')
+            pixels.extend(line)
+        image = Image.frombytes('P', (w, h), bytes(pixels))
+        image.putpalette(palette)
+        frames.append(image.convert('RGB'))
+    return frames
+
+
 def frame(image, inset=16):
     """Keep original corners and repeating edges; omit the dialog contents."""
     result = Image.new('RGBA', (inset * 3, inset * 3))
@@ -82,6 +119,8 @@ def main():
         'gold-button': blank_button(dialog.crop((246, 298, 346, 346))),
         'dark-button': dialog.crop((28, 77, 74, 109)),
     }
+    normal, pressed = menu_sprites(fetch(args.server, 'iam009.def'), red)
+    images.update({'menu-icon': normal, 'menu-icon-pressed': pressed})
     output = ROOT / 'web/site/skin.css'
     output.write_text('/* Locally rendered original game assets. Do not commit. */\n:root{\n' +
                       '\n'.join('--h3-' + name + ':' + data_url(image) + ';' for name, image in images.items()) + '\n}\n')
