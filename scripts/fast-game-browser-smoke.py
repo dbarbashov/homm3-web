@@ -10,6 +10,10 @@ with sync_playwright() as p:
     credentials=json.loads(Path(os.environ['SITE_ACCESS_FILE']).read_text()) if os.environ.get('SITE_ACCESS_FILE') else None
     options={'http_credentials':{k:credentials[k] for k in ('username','password')}} if credentials else {}
     display={'viewport':{'width':852,'height':393},'device_scale_factor':3,'is_mobile':True,'has_touch':True} if os.environ.get('VIEW')=='iphone' else {'viewport':{'width':1360,'height':1000}}
+    record=Path(os.environ['RECORD_DIR']).resolve() if os.environ.get('RECORD_DIR') else None
+    if record:
+        record.mkdir(parents=True,exist_ok=True)
+        options.update(record_video_dir=str(record/'raw'),record_video_size=display['viewport'])
     contexts=[browser.new_context(**display,**options) for _ in range(2)]
     for context in contexts: use_silent_audio(context)
     pages=[c.new_page() for c in contexts];logs=[[],[]];errors=[[],[]]
@@ -21,6 +25,7 @@ with sync_playwright() as p:
         for i,page in enumerate(pages):
             page.screenshot(path=str(OUT/f'{step}-{i}.png'),full_page=True)
             result.append(page.evaluate('({room:{title:window.homm3Room?.title,phase:window.homm3Room?.phase},state:window.homm3GameState,net:window.homm3NetworkState,heroes:window.homm3HeroStates,screen:window.homm3PortDiagnostics?.screen,queue:window.homm3Network.peek(),fast:window.__fastView,controls:window.__fastControls,status:document.querySelector("#status").textContent})'))
+        if record:a.wait_for_timeout(1300)
         (OUT/f'{step}.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(step,[{'player':c['state'].get('localPlayer'),'day':c['state'].get('day'),'hero':c['state'].get('hero'),'xy':[c['state'].get('x'),c['state'].get('y')]} if c.get('state') else c['screen'] for c in result],flush=True)
     try:
         a,b=pages
@@ -118,4 +123,10 @@ with sync_playwright() as p:
         for i,page in enumerate(pages):
             try:page.screenshot(path=str(OUT/f'last-{i}.png'),full_page=True)
             except:pass
-        (OUT/'console.json').write_text(json.dumps(logs,ensure_ascii=False,indent=2));(OUT/'errors.json').write_text(json.dumps(errors,ensure_ascii=False,indent=2));browser.close()
+        (OUT/'console.json').write_text(json.dumps(logs,ensure_ascii=False,indent=2));(OUT/'errors.json').write_text(json.dumps(errors,ensure_ascii=False,indent=2))
+        if record:
+            for i,context in enumerate(contexts):
+                video=pages[i].video
+                context.close()
+                video.save_as(str(record/f'player-{i+1}.webm'))
+        browser.close()
