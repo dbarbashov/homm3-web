@@ -33,31 +33,7 @@ SDL2 2.32.10 (zlib license) and zlib are used by the native/wasm builds;
 Emscripten 6.0.13 is the browser toolchain. Their source licenses are copied to
 `licenses/`. The SDK, generated binaries and retail resources are not committed.
 
-## Earlier map viewer (separate utility)
-
-The viewer compiles unmodified `tools/homm3-map/src/lib.rs` and
-`tools/homm3-def/src/lib.rs` using rustc for `wasm32-unknown-unknown`.
-No upstream generated data or retail EXE bytes are embedded into WASM.
-
-Renderer reference: `src/advmgr.cpp`:
-
-- `g_groundTilesetNames` at `0x0065f55c`
-- `g_riverTilesetNames` at `0x0065f584`
-- `g_roadTilesetNames` at `0x0065f598`
-- `drawGround` at `0x00412900`
-- `drawRiver` at `0x00411b80`
-- `drawRoad` at `0x00411d60` (vertical offset of 16 pixels)
-
-The browser renderer and its RGBA compositing are new implementations, not
-byte-matched exports of these C++ functions. In particular, shadow blending,
-palette cycling, flag recoloring and tile-level object ordering need more work.
-
-Heroes III game data belongs to its respective rights holders and remains in
-the user's existing installation. No LOD, music, maps, executable or other
-original game resource is included in the public source tree. Optional original
-UI fonts and hosted resource catalogs are generated separately and excluded from Git.
-
-- Native MP3 playback: `port/vendor/dr_mp3.h`, [dr_libs](https://github.com/mackron/dr_libs), commit `a466dbe88fe2576d46c43877d602f3d66b8561a7`. MIT-0 / public-domain dual license reproduced in the header. Browser playback uses Web Audio.
+Native MP3 playback: `port/vendor/dr_mp3.h`, [dr_libs](https://github.com/mackron/dr_libs), commit `a466dbe88fe2576d46c43877d602f3d66b8561a7`. MIT-0 / public-domain dual license reproduced in the header. Browser playback uses Web Audio.
 
 ## Website and room relay
 
