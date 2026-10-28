@@ -327,6 +327,18 @@
      heroWindowManager();
      virtual int open(int newPriority);
      virtual void close();
+@@ -101,10 +102,7 @@
+     // in-class definition is inferred from that visibility; the older DC
+     // source defined the helper out of line.
+     DC_ADDRESS(0x19b1f0, 0x3e)
+-    void updateScreen()
+-    {
+-        updateScreen(0, 0, 800, 600);
+-    }
++    void updateScreen();
+     void updateScreen(int x, int y, int width, int height);
+     void screenShot();
+     void saveFizzleSource(int startX, int startY, int width, int height);
 --- a/src/adventuremapwindow.cpp
 +++ b/src/adventuremapwindow.cpp
 @@ -1,4 +1,5 @@
@@ -343,6 +355,45 @@
  }
  
  // Defined at its retail address below; SendChat is its only caller and
+@@ -1169,8 +1171,22 @@
+             m_heroLocators[which]->setVisible(1);
+             m_heroLocators[which]->draw();
+         }
+-        if (update)
+-            g_windowManager->updateScreen(0x261, 32 * which + 0xd4, 0x30, 0x20);
++        if (update) {
++            // Widgets move with the HD layout. Commit the entire portrait and
++            // both bars, including mana to the right of the original rectangle.
++            widget* items[] = {m_heroPortraits[which],
++                getWidget(HERO_MOVEMENT_0_ID + which),
++                getWidget(HERO_MANA_0_ID + which)};
++            int left = m_width, top = m_height, right = 0, bottom = 0;
++            for (widget* item : items) {
++                left = std::min<int>(left, item->m_x);
++                top = std::min<int>(top, item->m_y);
++                right = std::max(right, item->m_x + item->m_width);
++                bottom = std::max(bottom, item->m_y + item->m_height);
++            }
++            g_windowManager->updateScreen(m_x + left, m_y + top,
++                                          right - left, bottom - top);
++        }
+     }
+ }
+ 
+@@ -1201,8 +1217,11 @@
+                              TOWN_0_ID + which, 1);
+             drawWindow(0, TOWN_0_ID + which, TOWN_0_ID + which);
+         }
+-        if (update)
+-            g_windowManager->updateScreen(0x2eb, 32 * which + 0xd4, 0x30, 0x20);
++        if (update) {
++            widget* icon = getWidget(TOWN_0_ID + which);
++            g_windowManager->updateScreen(m_x + icon->m_x, m_y + icon->m_y,
++                                          icon->m_width, icon->m_height);
++        }
+     }
+ }
+ 
 --- a/src/adventureoptionswindow.cpp
 +++ b/src/adventureoptionswindow.cpp
 @@ -80,9 +80,9 @@
@@ -884,6 +935,17 @@
          m_radarOrigin.m_z = curr->m_z;
          if (m_advWindow->setElevationToggleImage(m_radarOrigin.m_z))
              g_advManager->redrawAdvScreen(0, 0);
+@@ -7619,8 +7630,8 @@
+     if (drawChanges && g_completeDrawEnabled) {
+         updateRadar(0, 1, 0, 0, 0);
+         completeDraw(0);
+-        g_windowManager->updateScreen(0, 0, HOVER_SCREEN_WIDTH,
+-                                      HOVER_SCREEN_HEIGHT);
++        g_windowManager->updateScreen(0, 0, Port::HD::width(),
++                                      Port::HD::height());
+     }
+ 
+     type_point viewCentre = getMapCenter();
 @@ -8313,14 +8324,14 @@
          g_mouseManager->setPointer(dir + ADV_SCROLL_POINTER,
                                     mouseManager::ADVENTURE_SET);
@@ -3770,7 +3832,23 @@
  }
  
  // E:\gamedcs\winmgr.cpp:461
-@@ -480,10 +488,10 @@
+@@ -467,6 +475,15 @@
+     g_mouseManager->showPointer(false);
+ }
+ 
++// Full refreshes cover the adaptive map, while modal windows keep their
++// original source coordinate space for the overlay compositor.
++void heroWindowManager::updateScreen()
++{
++    const bool adventure = Port::HD::isAdventureWindow(topWindow());
++    updateScreen(0, 0, adventure ? Port::HD::width() : 800,
++                      adventure ? Port::HD::height() : 600);
++}
++
+ VA(0x00602bd0, 0x7C)
+ DC_ADDRESS(0x19b230, 0xf8)
+ MAC_ADDRESS(0x20df2c, 0x9c)
+@@ -480,10 +497,10 @@
          x = 0;
      if (y < 0)
          y = 0;
@@ -3785,7 +3863,7 @@
      blitToScreenWithPointer(x, y, width, height);
      g_mouseManager->enable();  // DC winmgr.cpp:899.
      pollSound();
-@@ -512,6 +520,14 @@
+@@ -512,6 +529,14 @@
  MAC_ADDRESS(0x20e03c, 0xb4)
  void heroWindowManager::fadeScreen(int inOut, int speed, unsigned char expectFadein)
  {
@@ -3800,7 +3878,7 @@
      if (inOut == 1) {
          if (expectFadein)
              g_mouseManager->hidePointer();
-@@ -555,10 +571,10 @@
+@@ -555,10 +580,10 @@
          height += startY;
          startY = 0;
      }
@@ -3815,7 +3893,7 @@
      if (width <= 0 || height <= 0)
          return;
      if (m_bmpFizzleSource)
-@@ -582,10 +598,10 @@
+@@ -582,10 +607,10 @@
              height += startY;
              startY = 0;
          }
@@ -3830,7 +3908,7 @@
  
          if (width > 0 && height > 0) {
              delete m_bmpFizzleSource;
-@@ -614,10 +630,10 @@
+@@ -614,10 +639,10 @@
          height += startY;
          startY = 0;
      }
@@ -3845,7 +3923,7 @@
      if (width <= 0 || height <= 0)
          return;
      int savedColorCycling = m_colorCyclingOn;
-@@ -704,10 +720,10 @@
+@@ -704,10 +729,10 @@
              height += startY;
              startY = 0;
          }
@@ -3860,7 +3938,7 @@
  
          if (width > 0 && height > 0) {
              int savedColorCycling = m_colorCyclingOn;
-@@ -822,10 +838,10 @@
+@@ -822,10 +847,10 @@
          height += startY;
          startY = 0;
      }
@@ -3875,7 +3953,7 @@
      if (width <= 0 || height <= 0)
          return;
      int savedColorCycling = m_colorCyclingOn;
-@@ -960,7 +976,7 @@
+@@ -960,7 +985,7 @@
      const unsigned int greenMask2 = (Bitmap16Bit::green_mask << 16) | Bitmap16Bit::green_mask;
      const unsigned int blueMask2 = (Bitmap16Bit::blue_mask << 16) | Bitmap16Bit::blue_mask;
      const int fadePeriod = 50;
@@ -3884,7 +3962,7 @@
      bmpFadeSource.Grab(m_screenBitmap, 0, 0);
  
      // DC winmgr.cpp:1793 calls mouseManager::Disable after Grab; its result
-@@ -974,10 +990,10 @@
+@@ -974,10 +999,10 @@
          dst.m_pixels = m_screenBitmap->GetMap(0, 0);
          Bitmap16ConstMapPointer src;
          src.m_pixels = bmpFadeSource.GetMap(0, 0);
@@ -3897,7 +3975,7 @@
                  const unsigned int r = *pixelSrc;
                  unsigned long blue = (r & redMask2) >> shift;
                  unsigned long green = (r & greenMask2) >> shift;
-@@ -990,18 +1006,18 @@
+@@ -990,18 +1015,18 @@
              dst.m_bytes += m_screenBitmap->GetPitch();
              src.m_bytes += bmpFadeSource.GetPitch();
          }
@@ -3922,7 +4000,7 @@
                             m_screenBitmap, 0, 0, false);
      }
  }
-@@ -1030,7 +1046,7 @@
+@@ -1030,7 +1055,7 @@
      const unsigned int maskGreen = (Bitmap16Bit::green_mask << 16) | Bitmap16Bit::green_mask;
      const unsigned int maskBlue = (Bitmap16Bit::blue_mask << 16) | Bitmap16Bit::blue_mask;
      const int fadePeriod = 50;
@@ -3931,7 +4009,7 @@
      fadeFrom.Grab(m_screenBitmap, 0, 0);
  
      for (int shift = 2; shift > 0; shift--) {
-@@ -1040,10 +1056,10 @@
+@@ -1040,10 +1065,10 @@
          dst.m_pixels = m_screenBitmap->GetMap(0, 0);
          Bitmap16ConstMapPointer src;
          src.m_pixels = fadeFrom.GetMap(0, 0);
@@ -3944,7 +4022,7 @@
                  unsigned long pair = *pixelSrc;
                  unsigned long blue = (pair & maskRed) >> shift;
                  unsigned long green = (pair & maskGreen) >> shift;
-@@ -1056,17 +1072,17 @@
+@@ -1056,17 +1081,17 @@
              dst.m_bytes += m_screenBitmap->GetPitch();
              src.m_bytes += fadeFrom.GetPitch();
          }
