@@ -70,6 +70,9 @@
   window.addEventListener('homm3-player-color',syncPlayerFlags);
   function renderRoom(next) {
     const previous=room; room=next; window.homm3Room=room; setBusy(false);
+    if(previous?.phase==='setup' && room?.phase==='interrupted' && window.homm3Boot.running) {
+      window.homm3Boot.fail('Не удалось начать партию: связь с одним из игроков потеряна. Создайте новую комнату.');
+    }
     $('chat-input').disabled=!room; updateChatButton();
     if(!room) {
       $('chat-rows').replaceChildren(); $('connection').textContent='Список открытых комнат';
@@ -114,7 +117,7 @@
       const row=document.createElement('tr'),cell=document.createElement('td');row.id='chat-empty';cell.colSpan=3;cell.textContent='Поздоровайтесь с другими игроками.';row.append(cell);$('chat-rows').append(row);
     }
     $('invite-link').value=location.origin+'/port/game.html#'+new URLSearchParams({room:room.id,...(room.private?{invite:room.invite}:{})});
-    $('start').disabled=true;
+    $('start').disabled=!window.homm3EngineError;
     $('connection').textContent=socket?.readyState===WebSocket.OPEN?'На связи':'Восстанавливаем соединение…';
     syncPanels();
   }
@@ -185,7 +188,7 @@
         pendingChat=null;connecting=null;me=null;setBusy(false);updateChatButton();
         $('connection').dataset.online='false';$('connection').textContent='Связь потеряна';$('ready').disabled=true;$('launch-room').disabled=true;
         reject(new Error('Соединение закрыто'));clearTimeout(reconnect);
-        if(room) reconnect=setTimeout(()=>connect().catch(e=>notice(e.message)),3000);
+        if(room && !window.homm3EngineError) reconnect=setTimeout(()=>connect().catch(e=>notice(e.message)),3000);
       };
     });
     try{await connecting;}finally{connecting=null;}
@@ -343,6 +346,15 @@
     playing(){if(me===room?.host)send({type:'playing'});}
   };
   window.addEventListener('homm3-ready',()=>{if(window.homm3PortDiagnostics?.screen==='adventure' && room?.phase==='setup')window.homm3Network.playing();});
+  window.addEventListener('homm3-failed',()=>{
+    clearTimeout(reconnect);
+    closeTavern();
+    $('view-actions').hidden=true;
+    // A dead WASM client must not silently reconnect and look ready to its peer.
+    token='';write('sessionStorage','homm3.session','');
+    if(room) history.replaceState(null,'',location.pathname+location.search+'#multiplayer');
+    socket?.close();
+  });
   renderIdentity();syncPanels();
   if(invitation || location.hash==='#multiplayer') {
     openTavern();

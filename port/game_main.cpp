@@ -126,5 +126,11 @@ int main(int argc,char** argv){
         ResourceManager::Dispose(g_mainBack);g_mainBack=nullptr;
         Port::closeDisplay();return 0;
     }catch(const Port::ExitRequested&){Port::closeDisplay();return 0;}
-    catch(const std::exception& e){fprintf(stderr,"Game startup: %s\n",e.what());return 1;}
+    catch(const std::exception& e){
+        fprintf(stderr,"Game startup: %s\n",e.what());
+#ifdef __EMSCRIPTEN__
+        EM_ASM({window.dispatchEvent(new CustomEvent('homm3-engine-error', {detail: UTF8ToString($0)}));}, e.what());
+#endif
+        return 1;
+    }
 }

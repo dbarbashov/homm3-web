@@ -1,0 +1,45 @@
+--- a/src/game.cpp
++++ b/src/game.cpp
+@@ -2675,6 +2675,15 @@
+     memset(m_id, 0, sizeof(m_id));
+     strcpy(m_id, "H3SVG");
+     m_version = 42;
++    // New-map lobby rows serialize this unused save header as well. Never
++    // let allocator bytes become a bool or select the campaign wire layout.
++    m_gameVersion = GAME_VERSION_SOD;
++    m_campaignGame = false;
++    m_difficultyRating = 0;
++    m_numDeadPlayers = 0;
++    m_currentPlayer = 0;
++    memset(m_deadPlayer, 0, sizeof(m_deadPlayer));
++    memset(m_humanPlayer, 0, sizeof(m_humanPlayer));
+ }
+ 
+ // E:\gamedcs\Game.h:1312
+@@ -2715,8 +2724,8 @@
+ MAC_ADDRESS(0x0cfa20, 0x214)  // anchor-layout + game::Save caller
+ int SavedGameHeader::save(TAbstractFile* outfile)
+ {
+-    char fileNameBuffer[0x15f];
+-    char compatibilityBuffer[32];
++    char fileNameBuffer[0x15f] = {};
++    char compatibilityBuffer[32] = {};
+ 
+     outfile->write(m_id, sizeof(m_id));
+ 
+--- a/include/game.h
++++ b/include/game.h
+@@ -526,6 +526,13 @@
+     NewSMapHeader()
+     {
+         m_version = 0;
++        m_isPlayable = 0;
++        m_size = 0;
++        m_hasTwoLayers = 0;
++        m_maxHeroLevel = 0;
++        m_numTeams = 0;
++        for (int i = 0; i < NUM_PLAYERS; ++i)
++            m_teamInfo[i] = i;
+         m_difficulty = 0;
+         m_numPlayers = 0;
+         m_minNumHumanPlayers = 0;

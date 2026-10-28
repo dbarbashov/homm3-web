@@ -6,7 +6,7 @@ from browser_audio import use_silent_audio
 BASE=os.environ.get('SITE_URL','http://127.0.0.1:8783')
 ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'test-results'/('fast-runtime-'+os.environ.get('BROWSER','chromium')+('-iphone' if os.environ.get('VIEW')=='iphone' else ''));OUT.mkdir(parents=True,exist_ok=True);(OUT/'results.json').unlink(missing_ok=True)
 with sync_playwright() as p:
-    browser=getattr(p,os.environ.get('BROWSER','chromium')).launch(headless=True)
+    browser=getattr(p,os.environ.get('BROWSER','chromium')).launch(headless=os.environ.get('HEADFUL')!='1')
     credentials=json.loads(Path(os.environ['SITE_ACCESS_FILE']).read_text()) if os.environ.get('SITE_ACCESS_FILE') else None
     options={'http_credentials':{k:credentials[k] for k in ('username','password')}} if credentials else {}
     display={'viewport':{'width':852,'height':393},'device_scale_factor':3,'is_mobile':True,'has_touch':True} if os.environ.get('VIEW')=='iphone' else {'viewport':{'width':1360,'height':1000}}
@@ -49,6 +49,7 @@ with sync_playwright() as p:
         a.wait_for_timeout(5000);dump('scenarios')
         box=a.locator('#canvas').bounding_box();a.locator('#canvas').click(position={'x':box['width']*495/800,'y':box['height']*555/600});a.wait_for_timeout(5000);dump('begin')
         assert not any(errors), errors
+        assert all(not page.evaluate('window.homm3EngineError') for page in pages), logs
         for page in pages: page.locator('#canvas').press('Enter')
         for page in pages: page.wait_for_function('window.homm3GameState?.day === 1',timeout=60000)
         dump('adventure')
@@ -116,6 +117,7 @@ with sync_playwright() as p:
         day=view(a)['absoluteDay'];a.locator('#canvas').press('e');a.wait_for_timeout(500);assert view(a)['absoluteDay']==day
         b.evaluate('window.homm3FastTransport.interrupt("Integration disconnect")');a.wait_for_function('window.homm3Room.phase==="interrupted"');assert a.locator('#fast-end-day').is_disabled()
         assert not any(errors),errors
+        assert all(not page.evaluate('window.homm3EngineError') for page in pages), logs
         (OUT/'results.json').write_text(json.dumps({'passed':True,'browser':os.environ.get('BROWSER','chromium'),'display':display,'checks':['two independent real WASM clients','both players move during same day','movement costs preserved','foreign hero rejected','paid creature recruitment and population','paid hero hiring','paid building and one building per day','guest continues after host ends day','shared AI/day barrier','original neutral combat casualties and experience','native mutation input blocked','interruption fails closed'],'errors':errors},indent=2))
     finally:
         try:dump('final-state')

@@ -76,6 +76,22 @@ waiting-host migration and mobile layout. `npm run test:network` drives two
 independent WASM clients through movement, turns, AI, battle and state transfer.
 Both require a local relay, matching assets and a running frontend.
 
+`python3 scripts/test-network-headers.py` checks 21 save-header round trips over
+seven allocator patterns, including empty lobby headers and actual campaign data.
+It requires the native SDL/FFmpeg build dependencies, but no game assets. Use
+`--video-root` to point at an existing native FFmpeg installation.
+`scripts/network-startup-smoke.py` checks two-client startup with `BROWSER=webkit`
+or `chromium`, `HEADFUL=1`, `HD=1`, and `FAST=1` as optional switches. `FAULT=1`
+injects the native-error event and checks visible failure, peer notification and
+reload into a fresh room browser. `AUDIO_SINK=device` runs the real audio clock
+through a zero-gain output; all test configurations remain inaudible.
+
+Lobby map rows carry a save header even for new maps. Its campaign flag and
+serialized defaults must be initialized: allocator garbage can make the writer
+omit campaign bytes while the reader expects them, killing the guest and leaving
+the host waiting at 98%. Native exceptions now show a reload screen and disconnect
+the failed client. An interrupted setup also shows an error to the other players.
+
 The relay's unit, isolation and capacity tests live with its private source.
 Full eight-player PvP, long sessions and recovery after a dropped match remain
 open validation areas. The relay verifies room membership and transport identity;
@@ -101,8 +117,12 @@ The `fastGame` boolean defaults to false when absent. Room discovery, snapshots,
 join/reconnect and host migration preserve the setting; it is fixed at creation.
 The client exposes an unchecked “Быстрая игра” switch with an explanation.
 
-This branch prepares configuration only. Simultaneous engine turns are not
-implemented. Enabled rooms explicitly show development status and cannot prepare
-or launch; the matching relay also rejects launch so they never silently run a
-sequential match under the fast-game label. Do not deploy this unfinished setting.
-The scope of the first actual engine mode is pending the user's choice.
+Enabled rooms run the simultaneous prototype on ordinary maps. A host C++/WASM
+engine applies authenticated commands ordered by the matching relay; snapshots
+update each client. Players move, build and recruit during the same day. The next
+day starts after all live human players finish. Combat and mandatory choices are
+automatic. Legacy rooms retain sequential turns and original controls.
+
+The prototype remains opt-in and requires the companion relay branch. Manual
+adventure spells, army/artifact rearrangement, reconnect/resume and long-session
+validation remain open. See the README for the current implementation scope.

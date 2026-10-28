@@ -8,6 +8,23 @@ let catalog;
 let archives;
 let exited = false;
 let prepared = false, preparing = null, runtimeReady = false, running = false, filesystemCreated = false;
+function failEngine(message) {
+  if (window.homm3EngineError) return;
+  window.homm3EngineError = String(message || 'Неизвестная ошибка движка');
+  exited = true;
+  if (window.homm3PortDiagnostics) window.homm3PortDiagnostics.ready = false;
+  document.querySelector('#launch-cover')?.removeAttribute('hidden');
+  document.querySelector('#source-hint').textContent = 'Не удалось продолжить игру. Перезагрузите страницу для новой попытки.';
+  for (const node of document.querySelectorAll('#launch-cover .file-label, #launch-cover .notice')) node.hidden = true;
+  progress.hidden = true;
+  status.textContent = window.homm3EngineError;
+  status.setAttribute('role', 'alert');
+  start.hidden = false; start.disabled = false; start.textContent = 'Перезагрузить страницу';
+  window.homm3Music?.stop();
+  window.dispatchEvent(new Event('homm3-failed'));
+  start.focus();
+}
+window.addEventListener('homm3-engine-error', event => failEngine(event.detail));
 const assetFetch = (...args) => (window.homm3Assets?.fetch || fetch)(...args);
 async function refreshCatalog() {
   const response = await assetFetch('/api/catalog');
@@ -33,7 +50,7 @@ window.Module = {
   locateFile: name => `/port/${name}`,
   print: text => console.log('[engine]', text),
   printErr: text => console.error('[engine]', text),
-  onAbort: text => { status.textContent = `Ошибка движка: ${text}`; },
+  onAbort: text => failEngine(`Ошибка движка: ${text}`),
   onRuntimeInitialized: async () => {
     try {
       runtimeReady = true;
@@ -118,12 +135,13 @@ function runGame(network=false) {
   running = true; window.dispatchEvent(new Event('homm3-running')); document.querySelector('#launch-cover')?.setAttribute('hidden','');
   Module.callMain(fullGame ? ['/runtime', ...(network ? ['--network'] : [])] : ['/data/']);
 }
-window.homm3Boot = { prepare, run: runGame, get running() { return running; }, get ready() { return runtimeReady; } };
+window.homm3Boot = { prepare, run: runGame, fail: failEngine, get running() { return running; }, get ready() { return runtimeReady; } };
 start.addEventListener('click', async () => {
   if (exited) { location.reload(); return; }
   try { await prepare(); runGame(); } catch(error) { status.textContent = error.message; start.textContent = 'Перезагрузите страницу для повтора'; }
 });
 window.addEventListener('homm3-ready', () => {
+  if (window.homm3EngineError) return;
   start.hidden = true; progress.hidden = true;
   const labels = { main: 'Главное меню', new: 'Новая игра', load: 'Загрузить игру', confirm: 'Подтверждение', message: 'Сообщение', scenarios: 'Выбор сценария / сохранения', adventure: 'Карта приключений', combat: 'Бой', 'combat-results': 'Результат боя' };
   const d = window.homm3PortDiagnostics;
@@ -135,6 +153,7 @@ window.addEventListener('homm3-command', event => {
   window.homm3PortDiagnostics.commands.push(event.detail);
 });
 window.addEventListener('homm3-exit', () => {
+  if (window.homm3EngineError) return;
   exited = true;
   if (window.homm3PortDiagnostics) { window.homm3PortDiagnostics.ready = false; window.homm3PortDiagnostics.screen = 'closed'; }
   status.textContent = 'Клиент закрыт';

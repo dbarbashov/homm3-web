@@ -6,7 +6,7 @@ from browser_audio import use_silent_audio
 BASE=os.environ.get('SITE_URL','http://127.0.0.1:8783')
 ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'test-results/network';OUT.mkdir(parents=True,exist_ok=True);(OUT/'results.json').unlink(missing_ok=True)
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True)
+    browser=getattr(p,os.environ.get('BROWSER','chromium')).launch(headless=os.environ.get('HEADFUL')!='1')
     credentials=json.loads(Path(os.environ['SITE_ACCESS_FILE']).read_text()) if os.environ.get('SITE_ACCESS_FILE') else None
     options={'http_credentials':{k:credentials[k] for k in ('username','password')}} if credentials else {}
     contexts=[browser.new_context(viewport={'width':1360,'height':1000},**options) for _ in range(2)]
@@ -41,6 +41,7 @@ with sync_playwright() as p:
         a.wait_for_timeout(5000);dump('scenarios')
         box=a.locator('#canvas').bounding_box();a.locator('#canvas').click(position={'x':box['width']*495/800,'y':box['height']*555/600});a.wait_for_timeout(5000);dump('begin')
         assert not any(errors), errors
+        assert all(not page.evaluate('window.homm3EngineError') for page in pages), logs
         for page in pages: page.locator('#canvas').press('Enter')
         for page in pages: page.wait_for_function('window.homm3GameState?.day === 1',timeout=60000)
         dump('adventure')
@@ -94,6 +95,7 @@ with sync_playwright() as p:
         b.wait_for_function('(exp)=>window.homm3GameState.player===1 && window.homm3HeroStates[0].experience===exp',arg=experience,timeout=30000)
         dump('post-battle-state-transfer')
         assert not any(errors), errors
+        assert all(not page.evaluate('window.homm3EngineError') for page in pages), logs
         (OUT/'results.json').write_text(json.dumps({'passed':True,'checks':['public room join','chat escaped as text','same build readiness','two independent WASM engines','different local players and fog','inactive guest input blocked','host movement synchronized','turn to guest','guest movement synchronized','AI and day two synchronized','neutral combat and return','battle experience transferred on next turn'],'errors':errors},ensure_ascii=False,indent=2))
         print('PASS: two-player networking, chat, movement, turns and AI day',flush=True)
 
