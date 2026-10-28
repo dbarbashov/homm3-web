@@ -11,7 +11,6 @@ node_modules/
 *.mp3
 *.snd
 *.vid
-web/engine.wasm
 test-results/
 
 web/port/homm3.js

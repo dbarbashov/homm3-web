@@ -3,7 +3,7 @@ from pathlib import Path
 import tarfile
 
 root = Path(__file__).resolve().parents[1]
-files = ['favicon.ico', 'index.html', 'viewer.html', 'app.js', 'engine.js', 'renderer.js', 'style.css', 'engine.wasm']
+files = ['favicon.ico', 'index.html']
 files += ['site/' + name for name in ['crest.webp', 'ui-leather.webp', 'ui-gold.webp', 'favicon.png', 'site.css', 'mobile.css', 'mobile.js', 'touch.js', 'report-bug.js', 'game.webmanifest', 'assets.js', 'video-archive.js', 'rooms.js', 'credits.html', 'resources.json']]
 files += ['port/' + name for name in ['game.html', 'game.js', 'game.wasm', 'boot.js', 'sha256.js', 'music.js', 'sfx.js']]
 output = root / '.local/deploy'
