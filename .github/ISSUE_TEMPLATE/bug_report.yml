@@ -1,0 +1,64 @@
+name: Bug report / Сообщить об ошибке
+description: Report a problem with the browser game. Можно писать по-русски.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports in English or Russian are welcome. This report will be public.
+        Можно писать по-русски. Отчёт будет виден всем.
+
+        Please check [existing reports](https://github.com/dbarbashov/homm3-web/issues) first.
+        Do not include private room invitations, chat, passwords, local paths or original game archives.
+        The website only prefills basic browser/display information and an engine/resource fingerprint;
+        review it below before submitting. No report is sent until you submit this form.
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened? / Что случилось?
+      placeholder: Describe the problem. / Опишите проблему.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Как повторить?
+      description: Include the map or campaign name and what you clicked. If it happened once, say so.
+      placeholder: |
+        1. Start a scenario...
+        2. Open...
+        3. Click...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / Что ожидалось?
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Game mode / Режим игры
+      options:
+        - Single scenario / Одиночный сценарий
+        - Campaign / Кампания
+        - Multiplayer / Игра с другими игроками
+        - Loading or menus / Загрузка или меню
+        - Other or unsure / Другое или не знаю
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Browser and device / Браузер и устройство
+      description: Prefilled when opened from the website. Otherwise enter your browser, OS and device. / С сайта заполняется автоматически; иначе укажите браузер, ОС и устройство.
+      placeholder: Chrome on Windows 11, laptop; or Safari on iPhone.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshot or extra details / Скриншот или подробности
+      description: Optional. You can drag a screenshot here. Crop private chat and invitation links. / Необязательно; скриншот можно перетащить сюда. Скрывайте переписку и ссылки приглашения.

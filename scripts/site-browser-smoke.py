@@ -11,7 +11,7 @@ with sync_playwright() as p:
     contexts=[browser.new_context(viewport={'width':1440,'height':900},**options) for _ in range(2)]
     a,b=[c.new_page() for c in contexts];errors=[]
     for page in [a,b]:page.on('pageerror',lambda e:errors.append(e.stack))
-    a.goto(BASE+'/');assert a.locator('main a').count()==2;assert a.get_by_role('link',name='GitHub').get_attribute('href')=='https://github.com/dbarbashov/homm3-web'
+    a.goto(BASE+'/');assert a.locator('main a').count()==3;assert a.get_by_role('link',name='GitHub',exact=True).get_attribute('href')=='https://github.com/dbarbashov/homm3-web'
     a.screenshot(path=str(OUT/'landing.png'))
     title='Тест '+str(time.time_ns())
     a.goto(BASE+'/port/game.html#multiplayer');a.locator('#player-name').fill('Изабель');a.locator('#show-create').click();a.locator('#room-name').fill(title);a.locator('#visibility').select_option('private');a.locator('#create-submit').click();a.wait_for_function('window.homm3Room?.players.length===1')

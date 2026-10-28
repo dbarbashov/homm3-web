@@ -1,8 +1,22 @@
 # Contributing
 
-Issues and focused pull requests are welcome. Describe the expected behavior,
-what happens instead, your browser/OS, and reproducible steps. Remove private
-room links, credentials and personal paths from logs before attaching them.
+Issues and focused pull requests are welcome. Use the
+[bug report form](https://github.com/dbarbashov/homm3-web/issues/new?template=bug_report.yml)
+or **Report a bug / Сообщить об ошибке** on the home page or in the game menu.
+Reports in English or Russian are welcome. Include the expected behavior,
+what happens instead, reproducible steps, and the map/campaign when relevant.
+GitHub sign-in is required and submitted reports are public.
+
+Website links prefill only the page category, browser user-agent, viewport,
+pixel ratio, touch availability, canvas size and, when ready, the combined
+engine/resource fingerprint. The form can be reviewed and edited before sending.
+It does not collect room invitations, chat, logs, saves or game files. Remove
+private room links, credentials and personal paths from any manual attachments.
+
+Maintainers and coding agents can read the same issue queue using GitHub or
+`gh issue list --repo dbarbashov/homm3-web --label bug`. To inspect a report and
+its discussion, use `gh issue view NUMBER --repo dbarbashov/homm3-web --comments`.
+Issue access does not imply background monitoring or automatic changes.
 
 Build instructions and test commands are in README.md. Preserve the recovered
 engine's rules; place platform adaptations in `port/` and keep upstream changes
