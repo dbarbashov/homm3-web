@@ -8,3 +8,34 @@ html:has(.game-immersive),body.game-immersive{position:fixed;inset:0;overflow:hi
 @media(max-height:480px){#game-sidebar{display:block}#game-sidebar>section,#game-sidebar>.nickname{margin-bottom:8px}.room-scroll{height:100px}.chat-log{height:100px}.chat-panel{min-height:0}#launch-cover{justify-content:flex-start;gap:10px}}
 
 #view-actions button,#view-actions .button{font-size:26px;line-height:1.15;padding:6px 5px;min-height:44px}
+
+/* On touch screens, keep the map visible and expand extra commands on demand. */
+#extra-controls,.extra-controls-grid{display:contents}
+@media(pointer:coarse) and (max-width:1000px){
+  .game-buttons{gap:4px;top:max(4px,env(safe-area-inset-top));left:max(4px,env(safe-area-inset-left))}
+  .game-buttons>button,#view-toggle{font-size:24px;min-height:36px;padding:3px 8px}
+  #view-actions{top:calc(100% + 4px);width:min(300px,calc(100vw - 12px));gap:4px;padding:6px;border-width:8px;border-image-width:8px;max-height:calc(var(--game-vh,100dvh) - 52px)}
+  #view-actions button,#view-actions .button{font-size:22px;line-height:1.1;min-height:40px;padding:4px}
+  #view-actions .report-link{grid-column:auto;font-size:22px}
+  #view-actions .control-help{font-size:12px;line-height:1.2}
+  #extra-controls{display:block;grid-column:1/-1}
+  #view-actions #extra-toggle{display:flex;width:100%;justify-content:flex-start;text-transform:none;min-height:40px;padding:8px;color:var(--text);background:#1b100b80;border:1px solid #957650;cursor:pointer;font-family:HeroesUI,Georgia,serif;font-size:16px}
+  .extra-controls-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding-top:4px}
+  #tavern{position:absolute;left:env(safe-area-inset-left);top:env(safe-area-inset-top);bottom:env(safe-area-inset-bottom);height:auto;z-index:5;width:min(280px,calc(100% - 12px));max-width:none;border-width:8px;border-image-width:8px;padding:6px;gap:6px;font-size:16px}
+  .tavern-heading{padding:2px 3px 4px;min-height:36px}
+  .tavern-heading h2{font-size:30px}
+  #game-sidebar{gap:6px}
+  .nickname{gap:5px}.nickname label{width:40px}
+  #tavern input,#tavern select{padding:4px 5px;font-size:16px;min-height:40px}
+  .panel-title{font-size:24px;min-height:32px}
+  .room-filters{gap:4px}.room-filters select{width:98px}
+  #tavern th,#tavern td{padding:5px 4px}
+  #tavern .room-actions{gap:4px}
+  #tavern .room-actions button{font-size:24px;min-height:40px;padding:4px}
+  #tavern .notice,#connection{font-size:12px}
+  #create-room{padding:6px;gap:6px}
+  .form-pair{gap:5px}
+  .chat-table th:first-child{width:40px}.chat-table th:nth-child(2){width:60px}
+}
+
+#extra-toggle::before{content:"▸";margin-right:6px}#extra-toggle[aria-expanded=true]::before{content:"▾"}

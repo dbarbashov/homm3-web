@@ -18,6 +18,12 @@
       document.documentElement.style.setProperty('--game-'+name,value+'px');
     render();
   }
+  const compactControls=matchMedia('(pointer:coarse) and (max-width:1000px)');
+  function setExtraControls(open){ $('extra-commands').hidden=!open;$('extra-toggle').setAttribute('aria-expanded',String(open)); }
+  function syncControlGroups(){ $('extra-toggle').hidden=!compactControls.matches;setExtraControls(!compactControls.matches); }
+  $('extra-toggle').onclick=()=>setExtraControls($('extra-commands').hidden);
+  compactControls.addEventListener('change',syncControlGroups);
+  syncControlGroups();
   function closeControls(){ $('view-actions').hidden=true;$('view-toggle').setAttribute('aria-expanded','false'); }
   $('view-toggle').onclick=()=>{const open=$('view-actions').hidden;$('view-actions').hidden=!open;$('view-toggle').setAttribute('aria-expanded',String(open));};
   let smoothCamera=!matchMedia('(prefers-reduced-motion: reduce)').matches;
