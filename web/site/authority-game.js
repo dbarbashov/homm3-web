@@ -4,6 +4,7 @@
   'use strict';
   const i32 = v => Number.isInteger(v) && v >= -2147483648 && v <= 2147483647;
   const revision = v => Number.isSafeInteger(v) && v >= 0;
+  let presentationNow=()=>Date.now();
   let active = false, stopped = false, ready = false, actor = -1, connected=true, lastError='';
   let appliedRevision = -1, nextRevision = -1, packet = null, copying = null;
   let sequence = 0, transport = null, choice = null, presenting = null, generation = null;
@@ -149,10 +150,11 @@
     },
     get revision() {return appliedRevision;},
     get pendingChoice(){return presenting?{token:presenting.token,kind:presenting.kind,presenting:true}:choice?{token:choice.token,kind:choice.kind,presenting:false}:null;},
-    start(sendMessage) {
+    start(sendMessage, clock=()=>Date.now()) {
       if (active) throw new Error('Authority client already started');
       if (typeof sendMessage !== 'function') throw new Error('Missing authority transport');
-      transport=sendMessage;active=true;stopped=false;
+      if(typeof clock!=='function')throw new Error('Invalid presentation clock');
+      presentationNow=clock;transport=sendMessage;active=true;stopped=false;
     },
     receive, send, fail,
     diagnostics(){
@@ -276,7 +278,7 @@
       else if(preparedCombatResult){currentCombatResult=combatResults.shift();if(presenting?.kind==='combat')presenting=null;}
       else if(combatPreparedChoice){presenting=choice;choice=null;}else combatObservation=null;
       heap.set(combatPacket,offset);combatPacket=null;freshCombatResume=false;
-      combatPresentedAt=Date.now();combatEnded=false;if(battleRevision<0)battleRevision=appliedRevision;
+      combatPresentedAt=presentationNow();combatEnded=false;if(battleRevision<0)battleRevision=appliedRevision;
     },
     get combatRendererReady(){return combatRendererIsReady;},
     get combatTactics(){return !!combatView?.tactics;},
@@ -288,7 +290,7 @@
     combatAuto(){return !!combatView?.autoCombat;},
     combatCanAuto(){return this.combatAuto()||!!combatView?.actions?.some(action=>action.action===103||action.action===104);},
     combatToggleAuto(){if(this.combatAuto()){combatStopRequested=true;if(this.combatCanAct()&&this.combatAction(104,-1,-1,-1)){combatStopRequested=false;return true;}return true;}return this.combatAction(103,-1,-1,-1);},
-    combatAutoStep(){if(this.combatAuto() && this.combatCanAct() && this.combatOffers(combatStopRequested?104:103) && Date.now()-combatPresentedAt>=80){const sent=this.combatAction(combatStopRequested?104:103,-1,-1,-1);if(sent)combatStopRequested=false;return sent;}return false;},
+    combatAutoStep(){if(this.combatAuto() && this.combatCanAct() && this.combatOffers(combatStopRequested?104:103) && presentationNow()-combatPresentedAt>=80){const sent=this.combatAction(combatStopRequested?104:103,-1,-1,-1);if(sent)combatStopRequested=false;return sent;}return false;},
     copyCombatSpellState(side,slot,heap,offset){const stack=combatView?.stacks?.find(s=>s.side===side&&s.slot===slot);if(!stack||!i32(stack.faerieDragonSpell)||!i32(stack.hasSpell))return 0;heap.set([stack.faerieDragonSpell,stack.hasSpell],offset);return 1;},
     copyCombatHeroName(side,bytes,capacity){const name=combatView?.heroes?.[side]?.nameBytes;if(!Array.isArray(name)||name.length>=capacity||!name.every(v=>i32(v)&&v>=0&&v<=255))return 0;bytes.set(name);bytes[name.length]=0;return 1;},
     combatResultLength(){

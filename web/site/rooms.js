@@ -5,13 +5,14 @@
   function read(store, key) { try { return window[store].getItem(key) || ''; } catch { return ''; } }
   function write(store, key, value) { try { window[store].setItem(key, value); return true; } catch { return false; } }
   const params = new URLSearchParams(location.hash.slice(1));
+  let resumeTarget = /^[0-9a-f]{32}$/.test(params.get('resume')||'') ? params.get('resume') : null;
   let invitation = params.has('room') ? {room:params.get('room'),invite:params.get('invite') || ''} : null;
   let socket, connecting, me, room, token = read('sessionStorage','homm3.session') || read('localStorage','homm3.session'), rooms = [], reconnect;
   function pendingLeave() {
     try{return localStorage.getItem('homm3.leavePending') ?? read('sessionStorage','homm3.leavePending');}
     catch{return read('sessionStorage','homm3.leavePending');}
   }
-  let leaving = !!token && pendingLeave()===token, leaveHome = false, leaveTimer;
+  let leaving = !!token && (pendingLeave()===token || !!resumeTarget), leaveHome = false, leaveTimer;
   function rememberLeave(value) {
     write('localStorage','homm3.leavePending',value ? token : '');
     write('sessionStorage','homm3.leavePending',value ? token : '');
@@ -26,7 +27,7 @@
     else connect().catch(()=>{});
   }
   let nickname = read('localStorage','homm3.nickname'), view = invitation ? 'invite' : 'browser', pendingAction = null;
-  let savedGames = [], pendingReport = null;
+  let savedGames = [], pendingReport = null, pendingReview = null, sessionReplaced = false;
   let busy = false, preparing = false, restoring = false, pendingChat = null, chatBlockedUntil = 0, chatTimer;
   const incoming = []; let queuedBytes = 0;
   const phaseLabel = r => ({waiting:r.players>=r.capacity?'Нет мест':'Ждём игроков',setup:'Выбор карты',playing:'Идёт игра',interrupted:'Прервана'}[r.phase] || r.phase);
@@ -100,8 +101,8 @@
     invitation=null;
     if(!previous || view!=='chat') view='room';
     $('room-title').textContent=room.title;
-    $('room-mode').hidden=!room.fastGame;
-    $('room-mode').textContent=room.fastGame?'Быстрая игра: все действуют одновременно. Бои и выборы событий — автоматические. Новый день начинается после готовности всех. Экспериментальный режим.':'';
+    $('room-mode').hidden=!room.fastGame && !room.training;
+    $('room-mode').textContent=room.training?'Тренировочная копия. Вы управляете своей стороной, остальные игроки — ИИ. Исходная партия не меняется.':room.fastGame?'Быстрая игра: все действуют одновременно. Бои и выборы событий — автоматические. Новый день начинается после готовности всех. Экспериментальный режим.':'';
     $('room-meta').textContent=`${room.private?'По приглашению':'Открытая'} · ${room.players.length}/${room.capacity} · ${phaseLabel({...room,players:room.players.length})}`;
     $('players').replaceChildren();
     room.players.forEach(p=>{
@@ -140,15 +141,15 @@
     $('connection').textContent=socket?.readyState===WebSocket.OPEN?'На связи':'Восстанавливаем соединение…';
     syncPanels();
   }
-  async function connect() {
+  async function connect(transferCode = '') {
     if(socket?.readyState===WebSocket.OPEN && me) return;
     if(connecting) return connecting;
-    if(!token && !validName(nickname)) throw new Error('Выберите имя игрока');
+    if(!transferCode && !token && !validName(nickname)) throw new Error('Выберите имя игрока');
     connecting=new Promise((resolve,reject)=>{
       const ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/lobby/socket`);
       socket=ws;ws.binaryType='arraybuffer';
       const timeout=setTimeout(()=>{ws.close();reject(new Error('Сервер не отвечает. Попробуйте ещё раз.'));},10000);
-      ws.onopen=()=>ws.send(JSON.stringify({type:'hello',token,name:nickname}));
+      ws.onopen=()=>ws.send(JSON.stringify({type:'hello',token,name:nickname,...(transferCode ? {transferCode} : {})}));
       ws.onmessage=event=>{
         if(socket!==ws)return;
         if(event.data instanceof ArrayBuffer) {
@@ -168,8 +169,18 @@
           incoming.push(new Uint8Array(event.data));queuedBytes+=event.data.byteLength;return;
         }
         const data=JSON.parse(event.data);
+        if(data.type==='game_review'){
+          if(pendingReview){clearTimeout(pendingReview.timer);pendingReview.tab.location.href=data.url;pendingReview=null;}return;
+        }
         if(data.type==='authority_report'){
           if(pendingReport){clearTimeout(pendingReport.timer);pendingReport.resolve(data.url);pendingReport=null;}return;
+        }
+        if(data.type?.startsWith('device_')){window.homm3Devices?.receive(data);return;}
+        if(data.type==='session_replaced'){
+          sessionReplaced=true;clearTimeout(reconnect);window.homm3Authority?.disconnect();
+          const message='Игра открыта в другой вкладке или на другом устройстве. Эта вкладка отключена. Чтобы вернуться сюда, обновите страницу.';
+          if(window.homm3Boot.running)window.homm3Boot.fail(message);else notice(message);
+          ws.close();return;
         }
         if(data.type==='saved_games'){savedGames=data.games;renderSavedGames();return;}
         if(data.type?.startsWith('authority_')){
@@ -200,6 +211,7 @@
           if(leaving)send({type:'leave'});
         }
         if(data.type==='error') {
+          if(pendingReview){clearTimeout(pendingReview.timer);pendingReview.tab.close();pendingReview=null;}
           if(pendingReport){clearTimeout(pendingReport.timer);pendingReport.reject(new Error(data.message));pendingReport=null;}
           setBusy(false);
           if(data.code==='chat_rejected') {
@@ -221,6 +233,7 @@
           leaving=false;rememberLeave(false);clearTimeout(leaveTimer);
           if(leaveHome){location.href='/';return;}
           renderRoom(null);location.hash='multiplayer';
+          if(resumeTarget){const target=resumeTarget;resumeTarget=null;send({type:'resume_game',room:target});return;}
           if(window.homm3Boot.running)location.reload();else{$('start').disabled=false;openTavern();}
         }
         if(data.type==='launch') {
@@ -242,7 +255,7 @@
         pendingChat=null;connecting=null;me=null;setBusy(false);updateChatButton();
         $('connection').dataset.online='false';$('connection').textContent='Связь потеряна';$('ready').disabled=true;$('launch-room').disabled=true;
         reject(new Error('Соединение закрыто'));clearTimeout(reconnect);
-        if(room && !leaveHome && !window.homm3EngineError) reconnect=setTimeout(()=>connect().catch(e=>notice(e.message)),3000);
+        if(room && !leaveHome && !sessionReplaced && !window.homm3EngineError) reconnect=setTimeout(()=>connect().catch(e=>notice(e.message)),3000);
       };
     });
     try{await connecting;}finally{connecting=null;}
@@ -255,12 +268,28 @@
   }
   function renderSavedGames() {
     const section=$('saved-games'),list=$('saved-games-list');if(!section)return;
-    section.hidden=!savedGames.length;list.replaceChildren();
+    section.hidden=!savedGames.length;list.replaceChildren();window.homm3Devices?.available(savedGames.length>0);
     for(const game of savedGames){
       const row=list.insertRow(),name=row.insertCell(),action=row.insertCell();name.textContent=game.title;action.className='room-join';
+      const summary=game.summary;if(summary){
+        const meta=document.createElement('small');meta.className='saved-game-meta';
+        const colors=['красного','синего','коричневого','зелёного','оранжевого','фиолетового','бирюзового','розового'];
+        const turn=summary.phase==='finished'?'Завершена':colors[summary.actor]?`Ход ${colors[summary.actor]}`:'';
+        const date=summary.updatedAt?new Date(summary.updatedAt*1000).toLocaleString('ru',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+        meta.textContent=[Number.isInteger(summary.day)?`День ${summary.day}`:'',turn,date].filter(Boolean).join(' · ');name.append(meta);
+      }
       const button=document.createElement('button');button.textContent='Продолжить';button.dataset.resumeRoom=game.room;button.disabled=busy;
-      button.onclick=()=>{try{setBusy(true);notice('Восстанавливаем партию…');send({type:'resume_game',room:game.room});}catch(e){setBusy(false);notice(e.message);}};
-      action.append(button);
+      button.onclick=async()=>{try{setBusy(true);notice('Восстанавливаем партию…');await connect();send({type:'resume_game',room:game.room});}catch(e){setBusy(false);notice(e.message);}};
+      const review=document.createElement('button');review.textContent='Разбор';review.className='secondary';review.dataset.reviewRoom=game.room;
+      review.onclick=async()=>{
+        if(pendingReview)return;
+        const tab=window.open('about:blank','_blank');if(!tab){notice('Разрешите открытие новой вкладки для разбора партии.');return;}
+        tab.document.title='Открываем запись партии…';tab.document.body.textContent='Проверяем сохранённую историю…';
+        const timer=setTimeout(()=>{pendingReview=null;tab.close();notice('Запись не открылась вовремя. Попробуйте ещё раз.');},45000);
+        pendingReview={tab,timer};
+        try{await connect();send({type:'review_game',room:game.room});}catch(error){clearTimeout(timer);pendingReview=null;tab.close();notice(error.message);}
+      };
+      action.append(button,review);
     }
   }
   function renderList() {
@@ -347,6 +376,17 @@
       return promise;
     }
   };
+  window.homm3Devices?.init({
+    async command(type){await connect();send({type});},
+    async claim(code){
+      if(room || window.homm3Boot.running || busy)throw new Error('Сначала выйдите из текущей комнаты.');
+      clearTimeout(reconnect);const old=socket;socket=null;old?.close();me=null;connecting=null;
+      setBusy(true);
+      try{await connect(code);show('browser');}
+      catch(error){const failed=socket;socket=null;failed?.close();throw error;}
+      finally{setBusy(false);}
+    }
+  });
   window.addEventListener('homm3-running',syncPanels);
   window.addEventListener('homm3-boot-ready',()=>{if(room)renderRoom(room);});
   $('copy-invite').onclick=async()=>{
@@ -427,7 +467,7 @@
     closeTavern();
     $('view-actions').hidden=true;
     // A dead WASM client must not silently reconnect and look ready to its peer.
-    if(!room?.serverAuthority){token='';write('sessionStorage','homm3.session','');write('localStorage','homm3.session','');}
+    if(!sessionReplaced && !room?.serverAuthority){token='';write('sessionStorage','homm3.session','');write('localStorage','homm3.session','');}
     if(room) history.replaceState(null,'',location.pathname+location.search+'#multiplayer');
     socket?.close();
   });
@@ -441,7 +481,7 @@
     show(invitation?'invite':'browser');
     openTavern();
   });
-  if(invitation || location.hash==='#multiplayer') {
+  if(invitation || resumeTarget || location.hash==='#multiplayer') {
     openTavern();
     if(token){setBusy(true);connect().catch(e=>notice(e.message)).finally(()=>setBusy(false));}
   }

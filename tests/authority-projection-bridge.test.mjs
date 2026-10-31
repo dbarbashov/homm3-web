@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {test} from 'node:test';
 const source=fs.readFileSync(new URL('../web/site/authority-game.js',import.meta.url),'utf8');
-function client(clock=Date,ready={}){
+function client(clock=Date,ready={},presentationClock){
   const window={homm3Network:{self:'a',host:'a'}},sent=[];
   vm.runInNewContext(source,{window,Date:clock,Number,Array,Map,Error});
-  const api=window.homm3Authority;api.start(m=>sent.push(m));
+  const api=window.homm3Authority;api.start(m=>sent.push(m),presentationClock);
   api.receive({type:'authority_ready',generation:'g1',actor:0,...ready});api.nativeReady('maps/trusted.h3m',Array(41).fill(0));
   const receive=m=>api.receive({generation:'g1',...m});
   const state=(revision=0)=>receive({type:'authority_state',schema:1,actor:0,revision,words:[1,0,0,1,1,1,36,1,...Array(13).fill(0)]});
@@ -398,4 +398,13 @@ test('older relay current choice already queued replaces its stale opening on a 
   receive({type:'authority_combat_state',actor:0,revision:0,data:{...battle([]),canAct:false}});
   receive({type:'authority_choice',actor:0,token:9,kind:'combat',options:[0],data:{...battle([{id:0,action:3,hex:-1,extra:-1,hex2:-1}]),round:4}});
   const words=new Int32Array(api.combatLength());api.takeCombat(words,0);assert.equal(words[0],4);
+});
+
+test('injected presentation time controls autobattle independently of wall time',()=>{
+  let virtual=1000,wall=10000;const {api,receive,sent}=client({now:()=>wall},{},()=>virtual);
+  const data={...battle([{id:0,action:103,hex:-1,extra:-1,hex2:-1}]),autoCombat:true};
+  receive({type:'authority_choice',actor:0,token:210,kind:'combat',options:[0],data});
+  api.takeCombat(new Int32Array(api.combatLength()),0);wall+=100000;
+  assert.equal(api.combatAutoStep(),false);virtual+=79;assert.equal(api.combatAutoStep(),false);
+  virtual+=1;assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).token,210);
 });
