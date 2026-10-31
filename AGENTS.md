@@ -1,7 +1,7 @@
 # Project boundaries
 
 - Keep the website, JavaScript client, browser tests and protocol documentation here.
-- Shared C++ rules, rendering, portability patches and cross-runtime harnesses
+- Shared C++ rules, rendering, portability code and cross-runtime harnesses
   belong in `homm3-engine`. Keep service implementations outside this repository.
 - Public documentation should explain usage and contributions, not internal
   repository organization or access policies.

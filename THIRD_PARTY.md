@@ -7,20 +7,19 @@ Revision: `e12906accf96c2662b1abadbc49ddc111991bf21`
 Branch: `decomp-complete-4.0`
 
 License: CC0 1.0 for reconstructed source/tooling. The complete upstream license
-is retained in `upstream/homm3-decomp/LICENSE`; a copy is in `licenses/`.
+is retained in `licenses/homm3-decomp-CC0.txt`.
 Third-party vendor directories in upstream have their own licenses. No legacy
 Miles/DirectDraw/Smacker/Bink runtime from those directories is linked by this port.
 
 ## Portable C++ client
 
-`homm3-engine/port/sources.json` lists the recovered source modules compiled directly for
-native and WebAssembly. `homm3-engine/port/patches/0001-portability.patch` records every change
-against the pinned revision. `homm3-engine/scripts/prepare-port.py` additionally extracts eight unchanged
-platform-independent helper bodies from `kbwin.cpp`, `wingraph.cpp`, `kb.cpp`
-and `misc.cpp`. The original main/game-type menu handlers execute directly.
-The game target (`homm3-engine/port/game-sources.json`) includes 131 recovered translation
-units, including kb startup/data helpers, scenario selection, game, adventure,
-town, battle, AI and serialization. Its original `normalDialog` executes directly.
+The recovered source and headers are tracked directly in `homm3-engine/src/`
+and `homm3-engine/include/`. The engine's `upstream-origin.json` records the original
+revision and unmodified import commit; subsequent Git commits contain the portable
+adaptations. Builds do not fetch, patch or extract the recovered source.
+`port/sources.json` and `port/game-sources.json` in the engine select the modules
+for the menu regression client and full game respectively. The original menu
+handlers and full-game `normalDialog` execute directly.
 The text-only `normalDialog` adapter in `homm3-engine/port/frontend/dialogs.cpp` assembles
 original dialog widgets using the recovered sizing algorithm; it does not
 implement the full game/item dialog dispatcher and is used only by the menu

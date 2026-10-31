@@ -12,6 +12,6 @@
     "test:site": "python3 scripts/site-browser-smoke.py && python3 scripts/local-assets-browser-smoke.py",
     "test:mobile": "python3 scripts/mobile-browser-smoke.py && BROWSER=chromium python3 scripts/mobile-browser-smoke.py"
   },
-  "description": "Public Heroes III browser shell; consumes a pinned private engine build",
+  "description": "Public Heroes III browser shell; consumes a pinned public engine build",
   "license": "MIT"
 }
