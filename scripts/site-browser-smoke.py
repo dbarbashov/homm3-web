@@ -34,9 +34,10 @@ with sync_playwright() as p:
   for page in [a,b]:page.locator('#chat-back').click()
   b.reload();b.wait_for_function('window.homm3Room?.players.length===2');assert b.locator('#identity-form').is_hidden();assert 'Роланд' in b.locator('#players').inner_text()
   a.locator('#leave-room').click();b.wait_for_function('window.homm3Room?.players.length===1');b.locator('#leave-room').click();b.wait_for_function('!window.homm3Room')
+  # Renaming preserves the durable identity and its saved-party memberships.
   old_token=b.evaluate('sessionStorage.getItem("homm3.session")');b.locator('#edit-name').click();entry(b,'Катрин');assert 'Катрин' in b.locator('#nickname-summary').inner_text()
   a.locator('#show-create').click();assert a.locator('#identity-form').is_hidden();a.locator('#visibility').select_option('public');a.locator('#create-submit').click();a.wait_for_function('window.homm3Room?.private===false')
-  b.locator('#refresh-rooms').click();b.get_by_role('button',name='Войти: '+title,exact=True).click();a.wait_for_function('window.homm3Room?.players.length===2');assert 'Катрин' in a.locator('#players').inner_text();assert b.evaluate('sessionStorage.getItem("homm3.session")')!=old_token
+  b.locator('#refresh-rooms').click();b.get_by_role('button',name='Войти: '+title,exact=True).click();a.wait_for_function('window.homm3Room?.players.length===2');assert 'Катрин' in a.locator('#players').inner_text();assert b.evaluate('sessionStorage.getItem("homm3.session")')==old_token
   assert b.evaluate('localStorage.getItem("homm3.nickname")')=='Катрин'
   for w,h in [(1000,700),(734,343),(393,659)]:
    b.set_viewport_size({'width':w,'height':h});b.wait_for_timeout(100)
