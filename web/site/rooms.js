@@ -7,6 +7,24 @@
   const params = new URLSearchParams(location.hash.slice(1));
   let invitation = params.has('room') ? {room:params.get('room'),invite:params.get('invite') || ''} : null;
   let socket, connecting, me, room, token = read('sessionStorage','homm3.session') || read('localStorage','homm3.session'), rooms = [], reconnect;
+  function pendingLeave() {
+    try{return localStorage.getItem('homm3.leavePending') ?? read('sessionStorage','homm3.leavePending');}
+    catch{return read('sessionStorage','homm3.leavePending');}
+  }
+  let leaving = !!token && pendingLeave()===token, leaveHome = false, leaveTimer;
+  function rememberLeave(value) {
+    write('localStorage','homm3.leavePending',value ? token : '');
+    write('sessionStorage','homm3.leavePending',value ? token : '');
+  }
+  function leaveToHome() {
+    if(leaveHome)return;
+    leaving=true;leaveHome=true;rememberLeave(true);clearTimeout(reconnect);
+    // An offline exit must still reach home. Keep the intent until the server
+    // acknowledges it, so the next connection cannot auto-restore the match.
+    leaveTimer=setTimeout(()=>{socket?.close();location.href='/';},1500);
+    if(socket?.readyState===WebSocket.OPEN && me)send({type:'leave'});
+    else connect().catch(()=>{});
+  }
   let nickname = read('localStorage','homm3.nickname'), view = invitation ? 'invite' : 'browser', pendingAction = null;
   let savedGames = [], pendingReport = null;
   let busy = false, preparing = false, restoring = false, pendingChat = null, chatBlockedUntil = 0, chatTimer;
@@ -134,6 +152,7 @@
       ws.onmessage=event=>{
         if(socket!==ws)return;
         if(event.data instanceof ArrayBuffer) {
+          if(leaving)return;
           if(event.data.byteLength>=4 && new DataView(event.data).getUint32(0,true)===0x31545346) {
             if(!room?.fastGame)return;
             try {
@@ -154,6 +173,7 @@
         }
         if(data.type==='saved_games'){savedGames=data.games;renderSavedGames();return;}
         if(data.type?.startsWith('authority_')){
+          if(leaving)return;
           if(!room?.serverAuthority)return;
           if(!window.homm3Authority.active)window.homm3Authority.start(send);
           window.homm3Authority.receive(data);
@@ -164,18 +184,20 @@
               try{
                 const deadline=Date.now()+30000;
                 while(!window.homm3Boot.ready){if(Date.now()>deadline)throw Error('Движок не загрузился');await new Promise(resolve=>setTimeout(resolve,50));}
-                await window.homm3Boot.prepare();closeTavern();window.homm3Boot.run('authority-restore');
+                if(leaving)return;
+                await window.homm3Boot.prepare();if(leaving)return;closeTavern();window.homm3Boot.run('authority-restore');
               }catch(error){window.homm3Boot.fail(error.message);}
               finally{restoring=false;}
             })();
           }
           return;
         }
-        if(data.type?.startsWith('fast_')){window.dispatchEvent(new CustomEvent('homm3-fast-control',{detail:data}));return;}
+        if(data.type?.startsWith('fast_')){if(!leaving)window.dispatchEvent(new CustomEvent('homm3-fast-control',{detail:data}));return;}
         if(data.type==='hello') {
           clearTimeout(timeout);me=data.id;token=data.token;write('sessionStorage','homm3.session',token);write('localStorage','homm3.session',token);
           nickname=data.name;write('localStorage','homm3.nickname',nickname);$('player-name').value=nickname;renderIdentity();
           $('connection').textContent='На связи';$('connection').dataset.online='true';resolve();
+          if(leaving)send({type:'leave'});
         }
         if(data.type==='error') {
           if(pendingReport){clearTimeout(pendingReport.timer);pendingReport.reject(new Error(data.message));pendingReport=null;}
@@ -186,7 +208,7 @@
           } else notice(data.message);
           if(!me){clearTimeout(timeout);reject(new Error(data.message));}
         }
-        if(data.type==='room')renderRoom(data.room);
+        if(data.type==='room' && !leaving)renderRoom(data.room);
         if(data.type==='renamed'){nickname=data.name;write('localStorage','homm3.nickname',nickname);renderIdentity();}
         if(data.type==='chat') {
           if(data.message.player===me && pendingChat!==null){
@@ -196,10 +218,13 @@
           if(room){room.chat.push(data.message);if(room.chat.length>100)room.chat.shift();}appendChat(data.message);
         }
         if(data.type==='left') {
+          leaving=false;rememberLeave(false);clearTimeout(leaveTimer);
+          if(leaveHome){location.href='/';return;}
           renderRoom(null);location.hash='multiplayer';
           if(window.homm3Boot.running)location.reload();else{$('start').disabled=false;openTavern();}
         }
         if(data.type==='launch') {
+          if(leaving)return;
           if(room?.serverAuthority){
             if(!window.homm3Authority.active)window.homm3Authority.start(send);
             notice('Организатор выбирает карту…');
@@ -217,7 +242,7 @@
         pendingChat=null;connecting=null;me=null;setBusy(false);updateChatButton();
         $('connection').dataset.online='false';$('connection').textContent='Связь потеряна';$('ready').disabled=true;$('launch-room').disabled=true;
         reject(new Error('Соединение закрыто'));clearTimeout(reconnect);
-        if(room && !window.homm3EngineError) reconnect=setTimeout(()=>connect().catch(e=>notice(e.message)),3000);
+        if(room && !leaveHome && !window.homm3EngineError) reconnect=setTimeout(()=>connect().catch(e=>notice(e.message)),3000);
       };
     });
     try{await connecting;}finally{connecting=null;}
@@ -310,7 +335,7 @@
     tavern.hidden=true;document.body.classList.remove('tavern-open','network-setup');$('canvas').focus({preventScroll:true});
   }
   $('close-tavern').onclick=closeTavern;
-  window.homm3Lobby={open:openTavern,close:closeTavern,
+  window.homm3Lobby={open:openTavern,close:closeTavern,leaveToHome,
     captureReport(){
       if(!room?.serverAuthority || !window.homm3Authority?.active)return null;
       if(pendingReport)return pendingReport.promise;
