@@ -407,6 +407,15 @@
     socket?.close();
   });
   renderIdentity();syncPanels();
+  window.addEventListener('hashchange',()=>{
+    if(room || busy || window.homm3Boot?.running)return;
+    const next=new URLSearchParams(location.hash.slice(1));
+    if(!next.has('room') && location.hash!=='#multiplayer')return;
+    invitation=next.has('room')?{room:next.get('room'),invite:next.get('invite') || ''}:null;
+    pendingAction=null;
+    show(invitation?'invite':'browser');
+    openTavern();
+  });
   if(invitation || location.hash==='#multiplayer') {
     openTavern();
     if(token){setBusy(true);connect().catch(e=>notice(e.message)).finally(()=>setBusy(false));}

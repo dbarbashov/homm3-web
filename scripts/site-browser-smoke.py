@@ -26,7 +26,10 @@ with sync_playwright() as p:
   a.screenshot(path=str(OUT/(engine+'-name.png')))
   entry(a,'Изабель');a.locator('#room-name').fill(title);a.locator('#visibility').select_option('private');a.locator('#create-submit').click();a.wait_for_function('window.homm3Room?.players.length===1')
   rid=a.evaluate('window.homm3Room.id');assert all(r['id']!=rid for r in a.request.get(BASE+'/lobby/rooms').json()['rooms'])
-  invite=a.locator('#invite-link').input_value();b.goto(invite);b.locator('#join-invite').click();assert b.locator('#identity-form').is_visible();entry(b,'Роланд');a.wait_for_function('window.homm3Room?.players.length===2')
+  invite=a.locator('#invite-link').input_value()
+  b.goto(BASE+'/port/game.html#multiplayer');b.evaluate('window.invitationNavigationProbe=true')
+  b.goto(invite);assert b.evaluate('window.invitationNavigationProbe'), 'Invitation must work without reloading the document'
+  b.locator('#join-invite').click();assert b.locator('#identity-form').is_visible();entry(b,'Роланд');a.wait_for_function('window.homm3Room?.players.length===2')
   assert a.locator('#ready').text_content()=='Подготовить игру';assert a.locator('#launch-room').is_hidden()
   for page in [a,b]:page.locator('#room-chat').click()
   b.locator('#chat-input').fill('<b>До встречи!</b>');b.locator('#chat-send').click();a.wait_for_function('document.querySelector("#chat-log").textContent.includes("До встречи!")');assert a.locator('#chat-log b').count()==0
