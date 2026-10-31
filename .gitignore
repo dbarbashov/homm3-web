@@ -54,3 +54,5 @@ scripts/build-secure-caddy.py
 scripts/install-secure-caddy-vps.sh
 scripts/bundle-test-assets.py
 scripts/install-test-assets-vps.sh
+
+web/port/engine-build.json

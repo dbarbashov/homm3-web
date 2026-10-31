@@ -13,27 +13,27 @@ Miles/DirectDraw/Smacker/Bink runtime from those directories is linked by this p
 
 ## Portable C++ client
 
-`port/sources.json` lists the recovered source modules compiled directly for
-native and WebAssembly. `port/patches/0001-portability.patch` records every change
-against the pinned revision. `prepare-port.py` additionally extracts eight unchanged
+`homm3-engine/port/sources.json` lists the recovered source modules compiled directly for
+native and WebAssembly. `homm3-engine/port/patches/0001-portability.patch` records every change
+against the pinned revision. `homm3-engine/scripts/prepare-port.py` additionally extracts eight unchanged
 platform-independent helper bodies from `kbwin.cpp`, `wingraph.cpp`, `kb.cpp`
 and `misc.cpp`. The original main/game-type menu handlers execute directly.
-The game target (`port/game-sources.json`) includes 131 recovered translation
+The game target (`homm3-engine/port/game-sources.json`) includes 131 recovered translation
 units, including kb startup/data helpers, scenario selection, game, adventure,
 town, battle, AI and serialization. Its original `normalDialog` executes directly.
-The text-only `normalDialog` adapter in `port/frontend/dialogs.cpp` assembles
+The text-only `normalDialog` adapter in `homm3-engine/port/frontend/dialogs.cpp` assembles
 original dialog widgets using the recovered sizing algorithm; it does not
 implement the full game/item dialog dispatcher and is used only by the menu
 regression target.
-The new SDL/file/media adapters and bootstrap are in `port/`; they do not replace
+The new SDL/file/media adapters and bootstrap are in `homm3-engine/port/`; they do not replace
 the game with independently implemented rules. The five small Victor PCX APIs
-are implemented portably in `port/platform/pcx.cpp`; no original binary is linked.
+are implemented portably in `homm3-engine/port/platform/pcx.cpp`; no original binary is linked.
 
 SDL2 2.32.10 (zlib license) and zlib are used by the native/wasm builds;
 Emscripten 6.0.13 is the browser toolchain. Their source licenses are copied to
 `licenses/`. The SDK, generated binaries and retail resources are not committed.
 
-Native MP3 playback: `port/vendor/dr_mp3.h`, [dr_libs](https://github.com/mackron/dr_libs), commit `a466dbe88fe2576d46c43877d602f3d66b8561a7`. MIT-0 / public-domain dual license reproduced in the header. Browser playback uses Web Audio.
+Native MP3 playback: `homm3-engine/port/vendor/dr_mp3.h`, [dr_libs](https://github.com/mackron/dr_libs), commit `a466dbe88fe2576d46c43877d602f3d66b8561a7`. MIT-0 / public-domain dual license reproduced in the header. Browser playback uses Web Audio.
 
 ## Website and room relay
 
@@ -58,12 +58,11 @@ The expanded adventure viewport and army/recruitment shortcuts are independently
 Bink and Smacker video/audio are decoded by [FFmpeg 8.0.3](https://ffmpeg.org/),
 built with GPL and nonfree components disabled, under LGPL 2.1 or later.
 The license is included in `licenses/ffmpeg-LGPL-2.1.txt`. No proprietary codec
-runtime is linked. `scripts/build-video.py` downloads the unmodified source,
+runtime is linked. `homm3-engine/scripts/build-video.py` downloads the unmodified source,
 verifies its SHA-256 and records the exact minimal configure command.
 
-To replace or modify FFmpeg, edit its source under `.local/ffmpeg-8.0.3`, remove
-`build/ffmpeg-web/install/version.txt` (or the native equivalent), and rebuild
-with the normal CMake commands in README. All application and linking sources
-are provided; users may modify and relink the client. FFmpeg source archives
-accompany downloadable client releases. Original `.vid`, `.bik` and `.smk`
-assets are supplied separately by the user and are not part of those releases.
+The C++ runtime source now lives in the private engine repository. Existing
+public-source releases and their license terms remain unchanged. New binary
+releases must include the applicable FFmpeg source and relinking materials;
+this repository split does not itself publish a new binary release. Original
+video/audio assets are supplied by the player and are never part of a bundle.

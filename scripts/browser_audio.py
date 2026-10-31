@@ -1,11 +1,11 @@
 """Run browser audio clocks without audible output in Chromium and WebKit."""
 
 
-def use_silent_audio(page):
-    page.add_init_script("""
+def use_silent_audio(page, device_sink=False):
+    page.add_init_script("const testDeviceSink = " + ('true;' if device_sink else 'false;') + """
         const NativeAudioContext = window.AudioContext || window.webkitAudioContext;
         if (NativeAudioContext) {
-            const silentSink = 'setSinkId' in NativeAudioContext.prototype;
+            const silentSink = !testDeviceSink && 'setSinkId' in NativeAudioContext.prototype;
             const SilentAudioContext = class extends NativeAudioContext {
                 constructor(options = {}) {
                     super(silentSink ? {...options, sinkId: {type: 'none'}} : options);

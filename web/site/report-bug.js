@@ -23,6 +23,22 @@
   }
   for (const link of document.querySelectorAll('[data-report-bug]')) {
     update(link);
+    link.addEventListener('click', async event => {
+      if(event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || !window.homm3Network?.serverAuthority)return;
+      const request=window.homm3Lobby?.captureReport();if(!request)return;
+      event.preventDefault();
+      const tab=window.open('about:blank','_blank');if(tab)tab.opener=null;
+      link.setAttribute('aria-busy','true');
+      try{const path=await request;if(!/^\/lobby\/reports\/[a-f0-9]{32}$/.test(path))throw Error('Invalid report URL');
+        update(link);
+        const issue=new URL(link.href);
+        issue.searchParams.set('evidence','Воспроизведение / Reproduction: '+new URL(path,location.origin).href);
+        if(tab)tab.location.replace(issue.href);else location.assign(issue.href);
+      }catch(error){
+        update(link);const fallback=new URL(link.href);fallback.searchParams.set('evidence','Автоматическая запись воспроизведения недоступна: '+String(error.message).slice(0,200));
+        if(tab)tab.location.replace(fallback.href);else location.assign(fallback.href);
+      }finally{link.removeAttribute('aria-busy');}
+    });
     for (const event of ['focus', 'pointerdown', 'click', 'auxclick', 'contextmenu']) {
       link.addEventListener(event, () => update(link));
     }

@@ -10,8 +10,10 @@ body:
 
         Please check [existing reports](https://github.com/dbarbashov/homm3-web/issues) first.
         Do not include private room invitations, chat, passwords, local paths or original game archives.
-        The website only prefills basic browser/display information and an engine/resource fingerprint;
-        review it below before submitting. No report is sent until you submit this form.
+        The website prefills basic browser/display information and an engine/resource fingerprint.
+        Server games also attach a read-only reproduction link in the extra details field;
+        this link exposes the game state visible to the reporter, without granting control.
+        Review the details below before submitting. No report is sent until you submit this form.
   - type: textarea
     id: actual
     attributes:
@@ -61,4 +63,4 @@ body:
     id: evidence
     attributes:
       label: Screenshot or extra details / Скриншот или подробности
-      description: Optional. You can drag a screenshot here. Crop private chat and invitation links. / Необязательно; скриншот можно перетащить сюда. Скрывайте переписку и ссылки приглашения.
+      description: May contain an automatic read-only reproduction link. You can add screenshots. Crop private chat and invitation links. / Здесь может быть ссылка на запись ошибки; можно добавить скриншоты. Скрывайте переписку и ссылки приглашения.
