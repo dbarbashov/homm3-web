@@ -109,7 +109,8 @@
       const li=document.createElement('li'), flag=document.createElement('span'), label=document.createElement('span'), state=document.createElement('small');
       flag.className='flag';flag.dataset.dpid=String(p.dpid);
       label.textContent=p.name+(p.id===me?' · вы':'')+(p.id===room.host?' · организатор':'');
-      state.textContent=!p.online?'Нет связи':room.phase==='playing'?'В игре':p.ready?'Готов':'Не готов';
+      const computer=room.training&&p.id!==room.host;
+      state.textContent=computer?'Компьютер':!p.online?'Нет связи':room.phase==='playing'?'В игре':p.ready?'Готов':'Не готов';
       li.append(flag,label,state);$('players').append(li);
     });
     syncPlayerFlags();

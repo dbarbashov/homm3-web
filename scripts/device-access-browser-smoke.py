@@ -55,11 +55,15 @@ with sync_playwright() as p:
     # Exit preserves membership but does not auto-return to the match.
     a.evaluate('window.homm3Lobby.leaveToHome()');a.wait_for_url(BASE+'/')
     a.goto(BASE+'/port/game.html#multiplayer');a.locator('[data-resume-room="'+room+'"]').wait_for()
-    a.locator('#device-access summary').click();a.locator('#device-create').click()
+    a.locator('#device-access > summary').click();a.locator('#device-create').click()
+    assert not a.locator('#device-claim').is_visible()
     a.locator('#device-issued').wait_for();code=a.locator('#device-code').input_value()
+    a.screenshot(path=str(OUT/'transfer-source.png'))
     third=browser.new_context(viewport={'width':852,'height':393},is_mobile=True,has_touch=True);contexts.append(third);use_silent_audio(third)
     c=third.new_page();c.on('pageerror',lambda error:errors.append(str(error)))
-    c.goto(BASE+'/port/game.html#multiplayer');c.locator('#device-access summary').click()
+    c.goto(BASE+'/port/game.html#multiplayer');c.locator('#device-access > summary').click()
+    assert not c.locator('#device-owner').is_visible()
+    c.screenshot(path=str(OUT/'transfer-receive-mobile.png'))
     c.locator('#device-input').fill(code);c.locator('#device-submit').click()
     c.locator('[data-resume-room="'+room+'"]').wait_for(timeout=30000)
     new=c.evaluate('localStorage.getItem("homm3.session")');assert new and new!=identity
@@ -68,9 +72,11 @@ with sync_playwright() as p:
     c.locator('[data-resume-room="'+room+'"]').click()
     c.wait_for_function('window.homm3Authority?.revision>=1 && window.homm3Boot.running',timeout=90000)
     c.evaluate('window.homm3Lobby.leaveToHome()');c.wait_for_url(BASE+'/');c.goto(BASE+'/port/game.html#multiplayer')
-    c.locator('[data-resume-room="'+room+'"]').wait_for();c.locator('#device-access summary').click()
+    c.locator('[data-resume-room="'+room+'"]').wait_for();c.locator('#device-access > summary').click()
+    c.locator('.device-security > summary').click()
     c.locator('#device-revoke').click();c.wait_for_function('document.querySelector("#device-status").textContent.includes("отозваны")')
     # Redeeming the same code again cannot overwrite the current identity.
+    c.locator('#device-receive').click()
     c.locator('#device-input').fill(code);c.locator('#device-submit').click()
     c.wait_for_function('document.querySelector("#device-status").textContent.includes("недействителен")')
     assert c.evaluate('localStorage.getItem("homm3.session")')==new
@@ -81,6 +87,10 @@ with sync_playwright() as p:
     review.wait_for_function('document.querySelector("#replay-status")?.textContent.includes("Проверено")',timeout=90000)
     review.frames[1].wait_for_function('window.homm3Authority?.revision>=1',timeout=60000)
     assert review.frames[1].evaluate('!window.homm3Room')
+    assert not review.locator('#replay-files').is_visible()
+    assert review.locator('#replay-choose-files').is_visible()
+    assert review.locator('.replay-controls').bounding_box()['height']<=70
+    review.screenshot(path=str(OUT/'review-mobile.png'))
     review.close()
     assert not errors,errors
     result={'passed':True,'browser':ENGINE,'independentStorage':True,'oldTabStopsReconnect':True,'sameSavedGame':True,'resumesNativeGame':True,'oneUse':True,'revoke':True,'savedGameReview':True,'errors':errors}

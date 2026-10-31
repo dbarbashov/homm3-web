@@ -1,3 +1,37 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Heroes III — запись партии</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/site/fonts.css"><link rel="stylesheet" href="/site/site.css"><link rel="stylesheet" href="/site/skin.css"><style>
-html,body{height:100%;margin:0}body{display:flex;flex-direction:column;background:#20150f;color:#f5df9d}.replay-controls{flex:none;padding:8px 12px;display:grid;gap:6px;background:var(--panel);box-shadow:0 2px 6px #0008}.replay-heading,.replay-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.replay-heading h1{font:28px HeroesTitle,Georgia,serif;margin:0 auto 0 0}.replay-heading a{color:#f5df9d}.replay-actions button,.replay-heading a{min-height:40px;align-content:center}.replay-actions input{flex:1;min-width:100px}.replay-actions output{font-variant-numeric:tabular-nums;min-width:60px;text-align:center}#replay-status{font:14px HeroesUI,Georgia,serif;margin:0;line-height:1.4}#replay-frame{flex:1;min-height:0;width:100%;border:0;pointer-events:none}.muted{color:#bda881;font-size:14px}@media(max-height:480px){.replay-heading h1{font-size:23px}.replay-controls{padding:4px 8px;gap:2px}.muted{display:none}}
-</style></head><body><header class="replay-controls"><div class="replay-heading"><h1>Запись партии</h1><span class="muted">Только просмотр · исходная игра не меняется</span><a id="replay-issue" target="_blank" rel="noopener noreferrer">Сообщить об ошибке</a><label class="file-label" for="replay-files">Файлы игры<input id="replay-files" type="file" webkitdirectory multiple></label><a href="/">На главную</a></div><nav class="replay-actions" aria-label="История партии"><button id="replay-prev" disabled aria-label="Предыдущий момент">←</button><button id="replay-play" disabled>Смотреть</button><input id="replay-position" type="range" min="0" max="0" value="0" aria-label="Момент партии" disabled><output id="replay-counter">—</output><button id="replay-next" disabled aria-label="Следующий момент">→</button><button id="replay-branch" disabled title="Продолжить отсюда в отдельной партии против ИИ">Сыграть иначе</button></nav><p id="replay-status" role="status">Проверяем запись…</p></header><iframe id="replay-frame" title="Сохранённый вид игры" inert></iframe><script src="/site/replay.js"></script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<title>Heroes III — запись партии</title><link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/site/fonts.css"><link rel="stylesheet" href="/site/site.css"><link rel="stylesheet" href="/site/skin.css">
+<style>
+html,body{height:100%;margin:0}body{display:flex;flex-direction:column;background:#20150f;color:var(--text)}
+.replay-controls{flex:none;padding:8px 12px;display:grid;gap:6px;background:var(--panel) var(--h3-leather);box-shadow:0 2px 6px #0008;z-index:1}
+.replay-heading,.replay-actions{display:flex;align-items:center;gap:8px;min-width:0}.replay-heading h1{font:28px HeroesTitle,Georgia,serif;margin-right:auto;white-space:nowrap}
+.replay-heading button,.replay-menu summary,.replay-menu a{font:15px HeroesUI,Georgia,serif;min-height:40px;display:flex;align-items:center;padding:4px 8px;color:var(--text)}
+.replay-menu{position:relative}.replay-menu summary{cursor:pointer;text-decoration:underline;text-underline-offset:3px;list-style:none}.replay-menu summary::-webkit-details-marker{display:none}.replay-menu[open] summary{color:var(--light)}
+.replay-menu-content{position:absolute;right:0;top:100%;min-width:220px;display:grid;gap:4px;padding:8px;background:var(--panel) var(--h3-leather);border:2px solid var(--gold);box-shadow:0 4px 12px #0009}.replay-menu a{text-decoration:none;white-space:nowrap}.replay-menu a:hover{background:#ffffff12}
+.replay-actions button{min-height:40px;font-size:24px;padding:3px 10px;white-space:nowrap}#replay-prev,#replay-next{width:40px;flex:none;font:24px Georgia,serif}#replay-play{min-width:110px}
+.replay-actions input{flex:1;width:0;min-width:60px;min-height:40px;margin:0;padding:0;accent-color:var(--light);cursor:pointer}.replay-actions output{font-size:14px;font-variant-numeric:tabular-nums;min-width:55px;text-align:center}
+.replay-feedback{display:flex;align-items:center;gap:8px;min-height:20px}#replay-status{font:14px/1.4 HeroesUI,Georgia,serif;color:var(--dim)}#replay-retry{font-size:15px;min-height:40px;flex:none}
+#replay-frame{flex:1;min-height:0;width:100%;border:0;pointer-events:none}.replay-controls[aria-busy=true] #replay-status{color:var(--light)}
+@media(max-height:480px) and (min-width:600px){.replay-controls{padding:2px 8px;gap:0 8px;grid-template-columns:minmax(0,1fr) auto}.replay-heading{grid-column:2;grid-row:1}.replay-heading h1{display:none}.replay-actions{grid-column:1;grid-row:1}.replay-feedback{grid-column:1/-1}.replay-feedback{min-height:18px}#replay-status{font-size:12px}.replay-actions{gap:6px}.replay-actions button{font-size:22px}}
+@media(max-width:560px){.replay-heading h1{font-size:24px}.replay-actions{flex-wrap:wrap;gap:4px}#replay-position{order:1;flex-basis:calc(100% - 70px)}#replay-counter{order:2}#replay-branch{margin-left:auto}.replay-controls{padding:4px 8px}.replay-heading{gap:2px}}
+@media(prefers-reduced-motion:no-preference){.replay-actions button:not(:disabled):active{scale:.96}}
+</style>
+</head>
+<body>
+<header class="replay-controls" aria-busy="true">
+  <div class="replay-heading"><h1>Запись партии</h1><button id="replay-choose-files" class="text-button" type="button">Файлы игры</button><input id="replay-files" hidden tabindex="-1" aria-label="Папка с файлами игры" type="file" webkitdirectory multiple>
+    <details class="replay-menu"><summary>Ещё</summary><nav class="replay-menu-content" aria-label="Действия с записью"><a id="replay-issue" target="_blank" rel="noopener noreferrer">Сообщить об ошибке</a><a href="/port/game.html#multiplayer">Мои партии</a><a href="/">На главную</a></nav></details>
+  </div>
+  <nav class="replay-actions" aria-label="История партии">
+    <button id="replay-prev" disabled aria-label="Предыдущий момент">←</button><button id="replay-play" disabled>Смотреть</button>
+    <input id="replay-position" type="range" min="0" max="0" value="0" aria-label="Момент партии" disabled><output id="replay-counter" for="replay-position">—</output>
+    <button id="replay-next" disabled aria-label="Следующий момент">→</button><button id="replay-branch" disabled title="Продолжить отсюда в отдельной партии против компьютера">Сыграть иначе</button>
+  </nav>
+  <div class="replay-feedback"><p id="replay-status" role="status">Открываем запись…</p><button id="replay-retry" class="text-button" type="button" hidden>Повторить</button></div>
+</header>
+<iframe id="replay-frame" title="Сохранённый вид игры" inert></iframe>
+<script src="/site/replay.js"></script>
+</body></html>

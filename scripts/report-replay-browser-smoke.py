@@ -134,6 +134,9 @@ with sync_playwright() as p:
     viewer.locator('#replay-position').fill(viewer.locator('#replay-position').get_attribute('max'))
     viewer.locator('#replay-position').dispatch_event('change')
     viewer.wait_for_function('document.querySelector("#replay-status").textContent.includes("Проверено") && !document.querySelector("#replay-branch").disabled',timeout=90000)
+    assert not viewer.locator('#replay-files').is_visible()
+    assert viewer.locator('.replay-controls').bounding_box()['height']<=70
+    viewer.screenshot(path=str(OUT/'replay-battle-mobile.png'))
     viewer.locator('#replay-branch').click()
     viewer.wait_for_url('**/port/game.html#*',timeout=90000)
     viewer.wait_for_function('(token)=>window.homm3Room?.training && window.homm3Authority?.combatRendererReady && window.homm3Authority.pendingChoice?.token===token',arg=token,timeout=90000)
@@ -145,6 +148,8 @@ with sync_playwright() as p:
     except Exception:
         print('branch defend failed',{'box':box,'size':size,'state':viewer.evaluate('({hd:window.homm3HDState,wanted:window.homm3HDSize,inputs:window.testAuthorityInputs,authority:window.homm3Authority.diagnostics(),game:window.homm3GameState,error:window.homm3EngineError})')},flush=True);raise
     assert b.evaluate('window.homm3Authority.revision')==original_revision
+    assert viewer.locator('#players small').all_text_contents().count('Компьютер')==1
+    assert 'Нет связи' not in viewer.locator('#players').text_content()
     print('training branch restored manual battle and accepted native defend input',flush=True)
     result={'passed':True,'localFilesAndSeek':local_replay,'manualBattleBranch':True,'nativeAdventure':True,'nativeBattle':True,'latestBattleChoice':True,'seekEarlier':True,'sourceUnchanged':True,'noLobbyConnection':True,'serviceRestartRestoresBattle':bool(restart_file),'errors':errors}
     (OUT/'results.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result),flush=True)

@@ -56,3 +56,8 @@ html[data-player-color] #room-progress{accent-color:var(--player-light)}
 .replay-view #view-actions,.replay-view #view-toggle,.replay-view #view-tavern{display:none!important}
 
 .saved-game-meta{display:block;color:var(--dim);font-size:13px;line-height:1.4;margin-top:4px}#saved-games .room-join button{margin:0 4px 4px 0;min-height:40px}
+
+/* Only the selected direction is expanded, so transfer never hides the lobby. */
+.device-directions{display:flex;gap:6px;margin-bottom:8px}.device-directions button{flex:1;font:16px HeroesUI,Georgia,serif;text-transform:none;padding:4px 8px}.device-directions [aria-pressed=true]{box-shadow:inset 0 0 0 1px var(--light);color:var(--light)}
+#device-owner{display:grid;gap:8px}#device-owner>button{justify-self:start;font-size:25px}#device-issued{display:grid;gap:5px}.device-security summary{font-size:14px;color:var(--dim)}.device-security button{font-size:23px;margin:8px 0}.device-access .network-form{width:100%;gap:6px}.device-access #device-code{flex:1 1 220px}.device-access #device-copy{flex:0 0 auto;font-size:24px}
+@media(max-height:480px){.device-access .notice{font-size:13px}.device-directions{margin-bottom:4px}#device-owner{gap:5px}}
