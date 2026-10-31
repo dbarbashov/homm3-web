@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build from an authorized engine checkout, or install a verified runtime bundle."""
+"""Build from the public engine checkout, or install a verified runtime bundle."""
 import argparse
 import hashlib
 import json
@@ -48,7 +48,7 @@ def main():
         if a.command == 'build':
             engine = a.engine.resolve()
             if not (engine / 'scripts/build-client.py').is_file():
-                p.error('Private engine checkout required. Set HOMM3_ENGINE_ROOT, or use engine:install with a trusted bundle.')
+                p.error('Engine checkout required (https://github.com/dbarbashov/homm3-engine). Set HOMM3_ENGINE_ROOT, or use engine:install with a trusted bundle.')
             actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=engine, text=True).strip()
             if actual != revision:
                 p.error('Engine revision differs from engine.lock.json; checkout ' + revision)

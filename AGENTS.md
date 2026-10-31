@@ -1,9 +1,9 @@
 # Project boundaries
 
-- This is the only public project repository. Keep the website, browser JavaScript,
+- This and `homm3-engine` are public repositories. Keep the website, browser JavaScript,
   browser tests and public protocol documentation here.
 - Shared C++ rules, rendering, portability patches and cross-runtime harnesses
-  belong in the private sibling `homm3-engine` repository. Rust and native worker
+  belong in the public sibling `homm3-engine` repository. Rust and native worker
   implementations belong in the private sibling `homm3-lobby` repository.
 - Update both consumers' `engine.lock.json` to the same tested engine commit.
   Use `npm run build` or `npm run engine:install`; packaging verifies the pin.
