@@ -15,11 +15,12 @@ try {
   installation = await openInstallation(config.gameRoot);
 } catch (error) { setupError = error.message; console.warn('Local game not configured:', setupError); }
 const port = Number(process.env.PORT || 8783);
+const lobbyPort = Number(process.env.LOBBY_PORT || 8784);
 const bindAddress = process.env.HOST || '0.0.0.0';
 const lanAddresses = Object.values(networkInterfaces()).flat().filter(n => n.family === 'IPv4' && !n.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(n.address)).map(n => n.address);
 const allowedHosts = new Set(['127.0.0.1', 'localhost', ...lanAddresses, hostname().toLowerCase()]);
 const mime = { '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
-const staticFiles = new Set(['site/crest.webp', 'site/ui-leather.webp', 'site/ui-gold.webp', 'favicon.ico', 'site/favicon.png', 'site/site.css', 'site/fonts.css', 'site/skin.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/report-bug.js', 'site/telemetry.js', 'site/privacy.html', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/rooms.js', 'site/status.html', 'site/credits.html', 'index.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
+const staticFiles = new Set(['site/crest.webp', 'site/ui-leather.webp', 'site/ui-gold.webp', 'favicon.ico', 'site/favicon.png', 'site/site.css', 'site/fonts.css', 'site/skin.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/report-bug.js', 'site/telemetry.js', 'site/privacy.html', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/rooms.js', 'site/fast-game.js', 'site/authority-game.js', 'site/status.html', 'site/credits.html', 'index.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
 
 const server = http.createServer(async (req, res) => {
   const send = (status, body, type = 'application/octet-stream') => {
@@ -29,7 +30,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (!allowedHosts.has((req.headers.host || '').split(':')[0].toLowerCase())) return send(403, 'Local network access only');
     if (req.url.startsWith('/lobby/')) {
-      const proxy = http.request({host:'127.0.0.1',port:8784,path:req.url,method:req.method,headers:req.headers}, upstream => { res.writeHead(upstream.statusCode,upstream.headers); upstream.pipe(res); });
+      const proxy = http.request({host:'127.0.0.1',port:lobbyPort,path:req.url,method:req.method,headers:req.headers}, upstream => { res.writeHead(upstream.statusCode,upstream.headers); upstream.pipe(res); });
       proxy.on('error', () => { if (!res.headersSent) send(503,'Lobby server unavailable'); else res.destroy(); });
       req.pipe(proxy); return;
     }
@@ -81,7 +82,7 @@ const server = http.createServer(async (req, res) => {
 });
 server.on('upgrade', (req, socket, head) => {
   if (req.url !== '/lobby/socket' || !allowedHosts.has((req.headers.host || '').split(':')[0].toLowerCase())) { socket.destroy(); return; }
-  const upstream = net.connect(8784, '127.0.0.1', () => {
+  const upstream = net.connect(lobbyPort, '127.0.0.1', () => {
     upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n` + Object.entries(req.headers).map(([k,v])=>`${k}: ${v}\r\n`).join('') + '\r\n');
     if (head.length) upstream.write(head); socket.pipe(upstream); upstream.pipe(socket);
   });
