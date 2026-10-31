@@ -61,8 +61,8 @@ The license is included in `licenses/ffmpeg-LGPL-2.1.txt`. No proprietary codec
 runtime is linked. `homm3-engine/scripts/build-video.py` downloads the unmodified source,
 verifies its SHA-256 and records the exact minimal configure command.
 
-The C++ runtime source now lives in the private engine repository. Existing
-public-source releases and their license terms remain unchanged. New binary
-releases must include the applicable FFmpeg source and relinking materials;
+The C++ runtime source is public at https://github.com/dbarbashov/homm3-engine. Existing
+public-source releases and their license terms remain unchanged. Binary
+releases must continue to include the applicable FFmpeg source and relinking materials;
 this repository split does not itself publish a new binary release. Original
 video/audio assets are supplied by the player and are never part of a bundle.
