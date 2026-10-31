@@ -44,11 +44,6 @@ objects; the room protocol transfers game state, not the original asset library.
 The Node development server can serve an existing local installation for local
 and LAN testing and must not be used as a public retail-resource distribution.
 
-The room relay uses Axum/Tokio/tower-http (MIT), Serde, UUID and futures-util
-(MIT OR Apache-2.0). Exact direct and transitive versions are in
-the private relay repository’s `Cargo.lock`. The relay replaces the DirectPlay transport boundary;
-no Microsoft DirectPlay runtime or new independent game rules are linked.
-
 ## HD-style interface
 
 The expanded adventure viewport and army/recruitment shortcuts are independently implemented in the portable C++ engine, inspired by the documented [Heroes III HD Mod interface](https://sites.google.com/site/heroes3hd/eng/functionality). No HD Mod binaries or code are bundled. Original interface artwork still comes from the user’s game installation.
