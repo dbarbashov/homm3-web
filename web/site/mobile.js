@@ -74,12 +74,23 @@
     }catch{/* iOS uses the complete available viewport; Home Screen mode hides browser chrome. */}
     resize();
   };
-  $('view-exit').onclick=()=>{
-    if(window.homm3Boot.running){$('exit-dialog').showModal();$('exit-cancel').focus();}
+  function exitToHome(){
+    if(window.homm3Room)window.homm3Lobby.leaveToHome();
     else location.href='/';
+  }
+  $('view-exit').onclick=()=>{
+    if(window.homm3Boot.running){
+      $('exit-description').textContent=window.homm3Room?.serverAuthority
+        ? 'Партия сохраняется автоматически. Продолжить её можно в разделе «Мои партии» в этом браузере.'
+        : window.homm3Room
+          ? 'Вы выйдете из сетевой комнаты. Текущая партия будет прервана.'
+          : 'Сначала сохраните партию в игровом меню. Изменения после последнего сохранения могут потеряться.';
+      $('exit-dialog').showModal();$('exit-cancel').focus();
+    }
+    else exitToHome();
   };
   $('exit-cancel').onclick=()=>$('exit-dialog').close();
-  $('exit-confirm').onclick=()=>{location.href='/';};
+  $('exit-confirm').onclick=exitToHome;
   document.addEventListener('fullscreenchange',resize);
   $('view-tavern').onclick=()=>{closeControls();window.homm3Lobby?.open();};
 
