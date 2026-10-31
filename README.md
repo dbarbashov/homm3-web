@@ -59,12 +59,15 @@ No new binary download is published as part of the repository split.
 npm test
 npm run test:site
 npm run test:mobile
-python3 scripts/bundle-site.py
+python3 scripts/bundle-site.py --ffmpeg-source /path/to/ffmpeg-8.0.3.tar.xz
 ```
 
 Browser checks require local assets, a built engine and Playwright. Native and
 legacy/authority parity tests live in the private engine repository. Packaging
 uses a public-file allowlist; it never archives a repository root.
+The packager verifies the matching FFmpeg source archive before including it.
+Packaging locally is not a binary release: distribution from private engine
+sources also needs the relinking materials described in `THIRD_PARTY.md`.
 
 See `docs/NETWORK.md` for browser protocol details and `THIRD_PARTY.md` for credits.
 Historical public commits remain available; this change does not retract source

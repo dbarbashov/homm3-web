@@ -3,8 +3,19 @@ from pathlib import Path
 import tarfile
 import subprocess
 import sys
+import argparse
+import hashlib
+import os
 
 root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--ffmpeg-source', type=Path,
+                    default=Path(os.environ.get('HOMM3_FFMPEG_SOURCE', root / '.local/ffmpeg-8.0.3.tar.xz')))
+args = parser.parse_args()
+if not args.ffmpeg_source.is_file():
+    parser.error('Supply the FFmpeg 8.0.3 source archive with --ffmpeg-source or HOMM3_FFMPEG_SOURCE')
+if hashlib.sha256(args.ffmpeg_source.read_bytes()).hexdigest() != '6136812ea6d4e68bdba27e33c2a94382711cdf4f8602ffef056ff792bd6f9818':
+    parser.error('FFmpeg source checksum mismatch')
 subprocess.run([sys.executable, str(root / 'scripts/engine-client.py'), 'verify'], check=True)
 files = ['favicon.ico', 'index.html']
 files += ['site/' + name for name in ['crest.webp', 'ui-leather.webp', 'ui-gold.webp', 'favicon.png', 'site.css', 'mobile.css', 'mobile.js', 'touch.js', 'report-bug.js', 'telemetry.js', 'privacy.html', 'game.webmanifest', 'assets.js', 'video-archive.js', 'rooms.js', 'fast-game.js', 'authority-game.js', 'credits.html', 'resources.json']]
@@ -23,7 +34,7 @@ with tarfile.open(output / 'site.tar.gz', 'w:gz', dereference=True) as tar:
             generated = output / name
             generated.write_text('/* Optional locally generated UI assets. */\n')
         tar.add(generated, arcname='web/site/' + name)
-    tar.add(root / '.local/ffmpeg-8.0.3.tar.xz', arcname='web/sources/ffmpeg-8.0.3.tar.xz')
+    tar.add(args.ffmpeg_source, arcname='web/sources/ffmpeg-8.0.3.tar.xz')
     tar.add(root / 'licenses/ffmpeg-LGPL-2.1.txt', arcname='web/sources/ffmpeg-LGPL-2.1.txt')
     # Local development reports include screenshots and machine paths: keep them off the VPS.
     status = output / 'public-status.html'
