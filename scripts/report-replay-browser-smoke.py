@@ -104,6 +104,9 @@ with sync_playwright() as p:
     try:a.wait_for_function('window.homm3Authority.combatRendererReady',timeout=30000)
     except Exception:
         print('combat did not open',a.evaluate('({game:window.homm3GameState,status:window.homm3AuthorityStatus,choice:window.homm3Authority.pendingChoice,revision:window.homm3Authority.revision})'),flush=True);raise
+    # Opening readiness may precede a faster enemy's automatic turn. Capture
+    # a settled human decision, not an already-consumed opening token.
+    a.wait_for_function('window.homm3Authority.combatCanAct()',timeout=60000)
     token=a.evaluate('window.homm3Authority.pendingChoice.token')
     restart_file=os.environ.get('HOMM3_TEST_RESTART_FILE')
     if restart_file:

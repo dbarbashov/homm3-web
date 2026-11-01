@@ -14,7 +14,7 @@ decision; the browser cannot submit arbitrary combat outcomes or world changes.
 See [durable games](durable-games.md) for recovery and report playback.
 
 Combat presentation journals contain ordered, 12-word records. The client reads
-versions 1–4. Version 2 adds morale, luck and synchronized impact effects; version
+versions 1–5. Version 2 adds morale, luck and synchronized impact effects; version
 3 adds event 13, the round boundary (`word[6]`: round number, `word[7]`: tactics
 flag), and event 14, resolved idle-animation delays. Event 14 packs five delays
 in words 7–11; word 6 is the starting index in the 42-slot stack array, and
@@ -33,7 +33,12 @@ selecting animated (1) or immediate (0) turning. Turns inside walking/flying
 are already part of those animations and are not journaled twice.
 Event 17 retains the final standing frame after a completed flight and facing
 restoration, including its original frame delay.
-Versions 1–3 remain supported.
+Version 5 adds event 18 for an original spell announcement. Words 6–10 carry
+spell ID (0–80), caster kind (hero 0, creature 1, artifact 2), casting side,
+and target side/slot (both -1 for no target). Announcements are emitted only
+where the original spell implementation requests them. Damage-only spells
+retain their damage message without an invented extra casting line.
+Versions 1–4 remain supported.
 
 Adventure sound records may include `fizzle: true`. The renderer captures the
 previous map before applying that projection, then runs the original eight-frame

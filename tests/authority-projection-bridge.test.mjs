@@ -376,7 +376,7 @@ test('versioned impact, morale and luck journal reaches native replay in order',
   assert.equal(api.combatPresentationVersion,2);assert.equal(api.fatal,false);
 });
 test('unknown journal version and invalid effect payloads fail closed',()=>{
-  for(const [version,kind,args] of [[5,1,[0,0,0,0]],[4,16,[2,0,0,0]],[3,16,[1,0,0,0]],[4,18,[0,0,0,0]],[3,17,[0,0,0,0]],[3,15,[150,0,0,0]],[4,15,[0,0,0,0]],[4,15,[10001,0,0,0]],[2,13,[2,0,0,0]],[3,13,[0,0,0,0]],[3,13,[2,2,0,0]],[3,14,[-1,0,0,0]],[3,14,[1,0,0,0]],[3,14,[45,0,0,0]],[2,14,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
+  for(const [version,kind,args] of [[6,1,[0,0,0,0]],[4,16,[2,0,0,0]],[3,16,[1,0,0,0]],[4,18,[0,0,0,0]],[3,17,[0,0,0,0]],[3,15,[150,0,0,0]],[4,15,[0,0,0,0]],[4,15,[10001,0,0,0]],[2,13,[2,0,0,0]],[3,13,[0,0,0,0]],[3,13,[2,2,0,0]],[3,14,[-1,0,0,0]],[3,14,[1,0,0,0]],[3,14,[45,0,0,0]],[2,14,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
     const {api,receive}=client();const data={...battle([]),canAct:false};data.presentationVersion=version;data.presentation=[[1,kind,0,0,86,1,...args,0,0]];
     receive({type:'authority_combat_state',actor:0,revision:0,data});assert.equal(api.combatLength(),0);assert.equal(api.fatal,true);
   }
@@ -455,4 +455,17 @@ test('fizzle cues preserve typed transitions and skip replayed history',()=>{
   update(sounds);assert.equal(api.pendingAdventureFizzle,false);apply();
   assert.equal(api.takeAdventureSound(bytes,81),0);
   update([{id:2,name:'pickup01.82M',fizzle:'yes'}]);apply();assert.equal(api.fatal,true);
+});
+
+// Spell announcements follow actual engine calls; damage-only spells do not
+// synthesize an extra announcement. Validate both single and mass targets.
+test('version 5 preserves original spell messages and rejects invalid targets',()=>{
+  for(const args of [[53,0,0,0,1,0],[53,0,1,-1,-1,0],[81,0,0,0,1,0],[53,3,0,0,1,0],[53,0,2,0,1,0],[53,0,0,-1,1,0],[53,0,0,0,-1,0],[53,0,0,2,1,0],[53,0,0,0,21,0]]){
+    const {api,receive}=client();const data={...battle([]),canAct:false,presentationVersion:5};
+    data.presentation=[[1,18,0,0,86,1,...args]];
+    receive({type:'authority_combat_state',actor:0,revision:0,data});
+    const valid=args[0]===53&&args[1]===0&&args[2]<2&&((args[3]===0&&args[4]===1)||(args[3]===-1&&args[4]===-1));
+    const length=api.combatLength();assert.equal(api.fatal,!valid);
+    if(valid){const words=new Int32Array(length);api.takeCombat(words,0);assert.deepEqual(Array.from(words.slice(-12)),data.presentation[0]);}
+  }
 });
