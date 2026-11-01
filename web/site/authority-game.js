@@ -205,10 +205,11 @@
     },
     takeChoice(heap, offset, text, capacity, fieldsCapacity=16) {
       if (!choice || presenting || packet || copying || appliedRevision<0 || combatResults.length || currentCombatResult) return 0;
-      if (!['normal','level_up','recruit','university','army_exchange','world_view','market','hill_fort','map_tavern','sacrifice','guild','hero_exchange','puzzle','shipyard'].includes(choice.kind)) {if(!['combat','combat_spell'].includes(choice.kind))fail('Unknown authoritative choice: '+choice.kind);return 0;}
+      if (!['normal','calendar','level_up','recruit','university','army_exchange','world_view','market','hill_fort','map_tavern','sacrifice','guild','hero_exchange','puzzle','shipyard'].includes(choice.kind)) {if(!['combat','combat_spell'].includes(choice.kind))fail('Unknown authoritative choice: '+choice.kind);return 0;}
       presenting=choice;choice=null;
       const d=presenting.data || {};let fields;
       if (presenting.kind==='normal') fields=Array.isArray(d.icons)&&d.icons.length>3?[11]:[1,d.mbType??1,d.special??-1,...Array.from({length:3},(_,i)=>d.icons?.[i]||[-1,0]).flat(),d.x??-1,d.y??-1];
+      else if(presenting.kind==='calendar') fields=[17,1,-1,-1,0,-1,0,-1,0,-1,-1];
       else if(presenting.kind==='level_up') fields=[2,d.hero,d.primary,...(d.skills||[])];
       else if(presenting.kind==='recruit'){
         if(!Array.isArray(d.creatures)||d.creatures.length<1||d.creatures.length>4){fail('Invalid recruitment offers');return 0;}
@@ -265,7 +266,7 @@
       for(const o of d.obstacles){out.push(o.hex,o.owner,o.duration,o.sprite.length);for(const ch of o.sprite)out.push(ch.charCodeAt(0));}
       out.push(d.cells.length);for(const cell of d.cells){if(cell.length!==49){fail('Invalid combat cell');return 0;}out.push(...cell);}
       const events=d.presentation||[];
-      if(![1,2].includes(d.presentationVersion??1)||!Array.isArray(events)||events.length>256||!events.every((e,i)=>Array.isArray(e)&&e.length===12&&e.every(i32)&&e[0]>0&&(i===0||e[0]===events[i-1][0]+1)&&e[1]>=1&&e[1]<=((d.presentationVersion??1)===2?12:9)&&(e[1]!==9||(e[6]>=0&&e[6]<81))&&(e[1]!==10||(e[6]===0||e[6]===1))&&(e[1]!==12||(e[6]>=-1&&e[6]<83&&(e[7]===0||e[7]===1)&&e[8]>=0&&e[8]<2097152&&e[9]>=0&&e[9]<2097152))&&e[2]>=0&&e[2]<=1&&e[3]>=0&&e[3]<21)){fail('Invalid battle presentation journal');return 0;}
+      if(![1,2,3].includes(d.presentationVersion??1)||!Array.isArray(events)||events.length>256||!events.every((e,i)=>Array.isArray(e)&&e.length===12&&e.every(i32)&&e[0]>0&&(i===0||e[0]===events[i-1][0]+1)&&e[1]>=1&&e[1]<=((d.presentationVersion??1)===3?14:(d.presentationVersion??1)===2?12:9)&&(e[1]!==14||(e[6]>=0&&e[6]<=40&&e[6]%5===0))&&(e[1]!==13||(e[6]>=1&&e[6]<=1000000&&(e[7]===0||e[7]===1)))&&(e[1]!==9||(e[6]>=0&&e[6]<81))&&(e[1]!==10||(e[6]===0||e[6]===1))&&(e[1]!==12||(e[6]>=-1&&e[6]<83&&(e[7]===0||e[7]===1)&&e[8]>=0&&e[8]<2097152&&e[9]>=0&&e[9]<2097152))&&e[2]>=0&&e[2]<=1&&e[3]>=0&&e[3]<21)){fail('Invalid battle presentation journal');return 0;}
       out.push(events.length,...events.flat());
       if(out.length>65536 || !out.every(i32)){fail('Invalid battle integer');return 0;}
       combatPacket=out;combatView=d;return out.length;

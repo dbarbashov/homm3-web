@@ -30,6 +30,17 @@ test('same-revision choice projection is installed before the original dialog op
   const fields=new Int32Array(16),text=new Uint8Array(20);
   assert.equal(api.takeChoice(fields,0,text,20),0);apply();assert.equal(api.takeChoice(fields,0,text,20),1);assert.equal(text[0],224);
 });
+test('calendar acknowledgement keeps its identity and waits for the day projection',()=>{
+  const {api,receive,state,apply,sent}=client();state(1);
+  receive({type:'authority_choice',actor:0,token:5,kind:'calendar',text:'New week',options:[30725],data:{}});
+  const fields=new Int32Array(16),text=new Uint8Array(32);
+  assert.equal(api.pendingChoice.kind,'calendar');
+  assert.equal(api.takeChoice(fields,0,text,32),0);apply();
+  assert.equal(api.takeChoice(fields,0,text,32),17);
+  assert.deepEqual(Array.from(fields.slice(0,11)),[17,1,-1,-1,0,-1,0,-1,0,-1,-1]);
+  assert.equal(api.answer(30725),true);assert.equal(sent.at(-1).token,5);
+  assert.equal(api.takeChoice(fields,0,text,32),0);
+});
 test('late packets from other generations cannot change the world or dismiss a request',()=>{
   const {api,receive,sent}=client();const id=api.send(5);
   assert.equal(receive({generation:'old',type:'authority_result',id:sent.find(m=>m.type==='authority_command').id,ok:false}),false);assert.equal(api.result(id),0);
@@ -365,10 +376,20 @@ test('versioned impact, morale and luck journal reaches native replay in order',
   assert.equal(api.combatPresentationVersion,2);assert.equal(api.fatal,false);
 });
 test('unknown journal version and invalid effect payloads fail closed',()=>{
-  for(const [version,kind,args] of [[3,1,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
+  for(const [version,kind,args] of [[4,1,[0,0,0,0]],[2,13,[2,0,0,0]],[3,13,[0,0,0,0]],[3,13,[2,2,0,0]],[3,14,[-1,0,0,0]],[3,14,[1,0,0,0]],[3,14,[45,0,0,0]],[2,14,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
     const {api,receive}=client();const data={...battle([]),canAct:false};data.presentationVersion=version;data.presentation=[[1,kind,0,0,86,1,...args,0,0]];
     receive({type:'authority_combat_state',actor:0,revision:0,data});assert.equal(api.combatLength(),0);assert.equal(api.fatal,true);
   }
+});
+
+test('round boundaries survive the version 3 presentation bridge',()=>{
+  const {api,receive}=client();const data={...battle([]),canAct:false,presentationVersion:3};
+  data.presentation=[[1,13,0,0,86,1,2,0,0,0,0,0],[2,14,0,0,86,1,0,-120,340,-2147483648,0,5]];
+  receive({type:'authority_combat_state',actor:0,revision:0,data});
+  const words=new Int32Array(api.combatLength());api.takeCombat(words,0);
+  assert.equal(api.combatPresentationVersion,3);
+  assert.deepEqual(Array.from(words.slice(-24)),data.presentation.flat());
+  assert.equal(api.fatal,false);
 });
 
 test('fresh page waits for current owner choice instead of replaying a cached opening',()=>{

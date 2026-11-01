@@ -5,7 +5,31 @@ links, readiness, reconnect to a waiting lobby, and a persistent in-page chat
 panel. Each participant runs a separate WASM engine with its own local player
 and fog of war. There is no shared screen, remote input, or hot-seat substitute.
 
-## Architecture
+## Authoritative games
+
+In authoritative rooms, the service runs the rules and sends each participant
+only their permitted view. The browser submits commands and renders the original
+map, town, combat and dialog windows. Choice tokens bind answers to the current
+decision; the browser cannot submit arbitrary combat outcomes or world changes.
+See [durable games](durable-games.md) for recovery and report playback.
+
+Combat presentation journals contain ordered, 12-word records. The client reads
+versions 1–3. Version 2 adds morale, luck and synchronized impact effects; version
+3 adds event 13, the round boundary (`word[6]`: round number, `word[7]`: tactics
+flag), and event 14, resolved idle-animation delays. Event 14 packs five delays
+in words 7–11; word 6 is the starting index in the 42-slot stack array, and
+`INT32_MIN` marks an unchanged slot. Delays are relative to the presentation
+boundary, not server wall time. The rules RNG state is never sent to clients.
+These events restore the original round message, selector and idle timing
+between actions. Old journals remain readable. A reconnect installs the latest
+snapshot and its journal watermark without replaying completed actions.
+
+The `calendar` choice is an informational acknowledgement with the original
+localized week/month text. Its native presentation follows time/town events and
+the new-turn map setup, including the calendar animation and week/month sample.
+Ordinary `normal` choices retain their existing order and appearance.
+
+## Legacy transport
 
 Browser UI → same-origin WebSocket → Rust Axum/Tokio room relay → other clients.
 The existing C++ `CDPlayHeroes`, `CNetMsg`, scenario selection, save transfer,
@@ -50,8 +74,7 @@ distributed attack. Rejections are private and preserve the user's draft.
 
 ## Local development and deployment
 
-The relay is a separate private repository. Maintainers may clone it next to this
-client as `../homm3-lobby`, or set `HOMM3_LOBBY_ROOT`. `npm start` starts it when
+To run a compatible relay locally, set `HOMM3_LOBBY_ROOT`. `npm start` starts it when
 present; otherwise the single-player client runs on its own. The development
 proxy expects the relay at `127.0.0.1:8784`.
 
@@ -92,7 +115,7 @@ omit campaign bytes while the reader expects them, killing the guest and leaving
 the host waiting at 98%. Native exceptions now show a reload screen and disconnect
 the failed client. An interrupted setup also shows an error to the other players.
 
-The relay's unit, isolation and capacity tests live with its private source.
+The relay implementation supplies its own unit, isolation and capacity tests.
 Full eight-player PvP, long sessions and recovery after a dropped match remain
 open validation areas. The relay verifies room membership and transport identity;
 it does not validate every legacy C++ game message or prevent cheating by clients.
