@@ -142,16 +142,25 @@ with sync_playwright() as p:
     viewer.wait_for_function('(token)=>window.homm3Room?.training && window.homm3Authority?.combatRendererReady && window.homm3Authority.pendingChoice?.token===token',arg=token,timeout=90000)
     viewer.wait_for_function('window.homm3Authority.combatCanAct()',timeout=60000)
     viewer.wait_for_function('window.homm3HDState.width===document.querySelector("#canvas").width && window.homm3HDState.height===document.querySelector("#canvas").height')
+    # A saved battle may still be in Tactics: the original placement bar has
+    # an End Placement button instead of the ordinary Defend button.
+    tactics_restored=viewer.evaluate('window.homm3Authority.combatTactics')
+    if tactics_restored:
+        box=viewer.locator('#canvas').bounding_box();size=viewer.evaluate('window.homm3HDState')
+        viewer.locator('#canvas').click(position={'x':box['width']*(size['overlayX']+518)/size['width'],'y':box['height']*(size['overlayY']+575)/size['height']})
+        viewer.wait_for_function('!window.homm3Authority.combatTactics && window.homm3Authority.combatCanAct()',timeout=30000)
+        assert viewer.evaluate('window.homm3Authority.pendingChoice.token')>token
+        token=viewer.evaluate('window.homm3Authority.pendingChoice.token')
     box=viewer.locator('#canvas').bounding_box();size=viewer.evaluate('window.homm3HDState')
     viewer.locator('#canvas').click(position={'x':box['width']*(size['overlayX']+770)/size['width'],'y':box['height']*(size['overlayY']+575)/size['height']})
     try:viewer.wait_for_function('(token)=>window.homm3Authority.pendingChoice?.token>token || window.homm3Authority.revision>'+str(original_revision),arg=token,timeout=15000)
     except Exception:
-        print('branch defend failed',{'box':box,'size':size,'state':viewer.evaluate('({hd:window.homm3HDState,wanted:window.homm3HDSize,inputs:window.testAuthorityInputs,authority:window.homm3Authority.diagnostics(),game:window.homm3GameState,error:window.homm3EngineError})')},flush=True);raise
+        print('branch defend failed',{'box':box,'size':size,'state':viewer.evaluate('({hd:window.homm3HDState,wanted:window.homm3HDSize,tactics:window.homm3Authority.combatTactics,inputs:window.testAuthorityInputs,authority:window.homm3Authority.diagnostics(),game:window.homm3GameState,error:window.homm3EngineError})')},flush=True);raise
     assert b.evaluate('window.homm3Authority.revision')==original_revision
     assert viewer.locator('#players small').all_text_contents().count('Компьютер')==1
     assert 'Нет связи' not in viewer.locator('#players').text_content()
     print('training branch restored manual battle and accepted native defend input',flush=True)
-    result={'passed':True,'localFilesAndSeek':local_replay,'manualBattleBranch':True,'nativeAdventure':True,'nativeBattle':True,'latestBattleChoice':True,'seekEarlier':True,'sourceUnchanged':True,'noLobbyConnection':True,'serviceRestartRestoresBattle':bool(restart_file),'errors':errors}
+    result={'passed':True,'localFilesAndSeek':local_replay,'manualBattleBranch':True,'tacticsRestored':tactics_restored,'nativeAdventure':True,'nativeBattle':True,'latestBattleChoice':True,'seekEarlier':True,'sourceUnchanged':True,'noLobbyConnection':True,'serviceRestartRestoresBattle':bool(restart_file),'errors':errors}
     (OUT/'results.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result),flush=True)
     assert not errors,errors
     for context in contexts:context.close()
