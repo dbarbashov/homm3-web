@@ -176,8 +176,8 @@
     applied() {
       if (!copying) {fail('Projection acknowledgement without state');return;}
       for(const sound of copying.adventureSounds||[]){
-        if(!Number.isSafeInteger(sound.id)||sound.id<1||typeof sound.name!=='string'||!/^[-A-Za-z0-9_.]{1,80}$/.test(sound.name)){fail('Invalid adventure sound');return;}
-        if(sound.id>lastAdventureSound){if(appliedRevision>=0)adventureSounds.push(sound.name);lastAdventureSound=sound.id;}
+        if(!Number.isSafeInteger(sound.id)||sound.id<1||typeof sound.name!=='string'||!/^[-A-Za-z0-9_.]{1,80}$/.test(sound.name)||(sound.fizzle!==undefined&&typeof sound.fizzle!=='boolean')){fail('Invalid adventure sound');return;}
+        if(sound.id>lastAdventureSound){if(appliedRevision>=0)adventureSounds.push(sound);lastAdventureSound=sound.id;}
       }
       if(adventureSounds.length>128){fail('Adventure sound queue overflow');return;}
       for(const notice of copying.notices||[]){
@@ -189,10 +189,11 @@
       const activeActor=copying.words[2],eliminated=!!copying.eliminated,finished=!!copying.finished;appliedRevision=copying.revision;copying=null;
       window.homm3AuthorityStatus={...window.homm3AuthorityStatus,error:false,message:'',revision:appliedRevision,actor,activeActor,eliminated,finished,outcome};
     },
+    get pendingAdventureFizzle(){return !stopped&&appliedRevision>=0&&!!packet?.adventureSounds?.some(s=>s.id>lastAdventureSound&&s.fizzle===true);},
     takeAdventureSound(bytes,capacity) {
       if(stopped||packet||copying||!adventureSounds.length)return 0;
-      const name=adventureSounds[0];if(capacity<=name.length)return 0;
-      adventureSounds.shift();for(let i=0;i<name.length;++i)bytes[i]=name.charCodeAt(i);bytes[name.length]=0;return 1;
+      const {name,fizzle}=adventureSounds[0];if(capacity<=name.length)return 0;
+      adventureSounds.shift();for(let i=0;i<name.length;++i)bytes[i]=name.charCodeAt(i);bytes[name.length]=0;return fizzle?2:1;
     },
     result(ticket) {
       const request=requests.get(String(ticket));
@@ -266,7 +267,7 @@
       for(const o of d.obstacles){out.push(o.hex,o.owner,o.duration,o.sprite.length);for(const ch of o.sprite)out.push(ch.charCodeAt(0));}
       out.push(d.cells.length);for(const cell of d.cells){if(cell.length!==49){fail('Invalid combat cell');return 0;}out.push(...cell);}
       const events=d.presentation||[];
-      if(![1,2,3].includes(d.presentationVersion??1)||!Array.isArray(events)||events.length>256||!events.every((e,i)=>Array.isArray(e)&&e.length===12&&e.every(i32)&&e[0]>0&&(i===0||e[0]===events[i-1][0]+1)&&e[1]>=1&&e[1]<=((d.presentationVersion??1)===3?14:(d.presentationVersion??1)===2?12:9)&&(e[1]!==14||(e[6]>=0&&e[6]<=40&&e[6]%5===0))&&(e[1]!==13||(e[6]>=1&&e[6]<=1000000&&(e[7]===0||e[7]===1)))&&(e[1]!==9||(e[6]>=0&&e[6]<81))&&(e[1]!==10||(e[6]===0||e[6]===1))&&(e[1]!==12||(e[6]>=-1&&e[6]<83&&(e[7]===0||e[7]===1)&&e[8]>=0&&e[8]<2097152&&e[9]>=0&&e[9]<2097152))&&e[2]>=0&&e[2]<=1&&e[3]>=0&&e[3]<21)){fail('Invalid battle presentation journal');return 0;}
+      if(![1,2,3,4].includes(d.presentationVersion??1)||!Array.isArray(events)||events.length>256||!events.every((e,i)=>Array.isArray(e)&&e.length===12&&e.every(i32)&&e[0]>0&&(i===0||e[0]===events[i-1][0]+1)&&e[1]>=1&&e[1]<=((d.presentationVersion??1)>=4?17:(d.presentationVersion??1)===3?14:(d.presentationVersion??1)===2?12:9)&&(e[1]!==16||(e[6]===0||e[6]===1))&&(e[1]!==15||(e[6]>0&&e[6]<=10000))&&(e[1]!==14||(e[6]>=0&&e[6]<=40&&e[6]%5===0))&&(e[1]!==13||(e[6]>=1&&e[6]<=1000000&&(e[7]===0||e[7]===1)))&&(e[1]!==9||(e[6]>=0&&e[6]<81))&&(e[1]!==10||(e[6]===0||e[6]===1))&&(e[1]!==12||(e[6]>=-1&&e[6]<83&&(e[7]===0||e[7]===1)&&e[8]>=0&&e[8]<2097152&&e[9]>=0&&e[9]<2097152))&&e[2]>=0&&e[2]<=1&&e[3]>=0&&e[3]<21)){fail('Invalid battle presentation journal');return 0;}
       out.push(events.length,...events.flat());
       if(out.length>65536 || !out.every(i32)){fail('Invalid battle integer');return 0;}
       combatPacket=out;combatView=d;return out.length;

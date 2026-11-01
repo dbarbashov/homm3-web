@@ -376,7 +376,7 @@ test('versioned impact, morale and luck journal reaches native replay in order',
   assert.equal(api.combatPresentationVersion,2);assert.equal(api.fatal,false);
 });
 test('unknown journal version and invalid effect payloads fail closed',()=>{
-  for(const [version,kind,args] of [[4,1,[0,0,0,0]],[2,13,[2,0,0,0]],[3,13,[0,0,0,0]],[3,13,[2,2,0,0]],[3,14,[-1,0,0,0]],[3,14,[1,0,0,0]],[3,14,[45,0,0,0]],[2,14,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
+  for(const [version,kind,args] of [[5,1,[0,0,0,0]],[4,16,[2,0,0,0]],[3,16,[1,0,0,0]],[4,18,[0,0,0,0]],[3,17,[0,0,0,0]],[3,15,[150,0,0,0]],[4,15,[0,0,0,0]],[4,15,[10001,0,0,0]],[2,13,[2,0,0,0]],[3,13,[0,0,0,0]],[3,13,[2,2,0,0]],[3,14,[-1,0,0,0]],[3,14,[1,0,0,0]],[3,14,[45,0,0,0]],[2,14,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
     const {api,receive}=client();const data={...battle([]),canAct:false};data.presentationVersion=version;data.presentation=[[1,kind,0,0,86,1,...args,0,0]];
     receive({type:'authority_combat_state',actor:0,revision:0,data});assert.equal(api.combatLength(),0);assert.equal(api.fatal,true);
   }
@@ -432,4 +432,27 @@ test('wall-clock jumps cannot start Auto before the renderer is ready',()=>{
   now+=100000;assert.equal(api.combatAutoStep(),false);
   api.rendererReady(true);now=0;assert.equal(api.combatAutoStep(),true);
   assert.equal(api.combatAutoStep(),false);
+});
+
+ test('version 4 preserves unscaled combat pauses for client speed',()=>{
+  const {api,receive}=client();const data={...battle([]),canAct:false,presentationVersion:4};
+  data.presentation=[[1,15,0,0,86,1,150,0,0,0,0,0]];
+  receive({type:'authority_combat_state',actor:0,revision:0,data});
+  const words=new Int32Array(api.combatLength());api.takeCombat(words,0);
+  assert.equal(api.combatPresentationVersion,4);
+  assert.deepEqual(Array.from(words.slice(-12)),data.presentation.flat());
+  assert.equal(api.fatal,false);
+});
+
+test('fizzle cues preserve typed transitions and skip replayed history',()=>{
+  const {api,receive,apply}=client();
+  const update=sounds=>receive({type:'authority_state',schema:1,actor:0,revision:0,words:[1,0,0,1,1,1,36,1,...Array(13).fill(0)],adventureSounds:sounds});
+  const sounds=[{id:1,name:'killfade.82M',fizzle:true}];
+  update(sounds);assert.equal(api.pendingAdventureFizzle,true);apply();
+  assert.equal(api.pendingAdventureFizzle,false);
+  const bytes=new Uint8Array(81);assert.equal(api.takeAdventureSound(bytes,81),2);
+  assert.equal(new TextDecoder().decode(bytes.slice(0,bytes.indexOf(0))),'killfade.82M');
+  update(sounds);assert.equal(api.pendingAdventureFizzle,false);apply();
+  assert.equal(api.takeAdventureSound(bytes,81),0);
+  update([{id:2,name:'pickup01.82M',fizzle:'yes'}]);apply();assert.equal(api.fatal,true);
 });

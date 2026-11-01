@@ -14,7 +14,7 @@ decision; the browser cannot submit arbitrary combat outcomes or world changes.
 See [durable games](durable-games.md) for recovery and report playback.
 
 Combat presentation journals contain ordered, 12-word records. The client reads
-versions 1–3. Version 2 adds morale, luck and synchronized impact effects; version
+versions 1–4. Version 2 adds morale, luck and synchronized impact effects; version
 3 adds event 13, the round boundary (`word[6]`: round number, `word[7]`: tactics
 flag), and event 14, resolved idle-animation delays. Event 14 packs five delays
 in words 7–11; word 6 is the starting index in the 42-slot stack array, and
@@ -23,6 +23,22 @@ boundary, not server wall time. The rules RNG state is never sent to clients.
 These events restore the original round message, selector and idle timing
 between actions. Old journals remain readable. A reconnect installs the latest
 snapshot and its journal watermark without replaying completed actions.
+
+Version 4 adds event 15 for the original pause before retaliation or a second
+melee strike. Word 6 carries a positive duration in unscaled milliseconds
+(at most 10,000); the renderer applies its local combat speed. The service
+records the boundary without sleeping. This also preserves the frame-clock
+phase of subsequent luck effects. Event 16 restores a stack turn, with word 6
+selecting animated (1) or immediate (0) turning. Turns inside walking/flying
+are already part of those animations and are not journaled twice.
+Event 17 retains the final standing frame after a completed flight and facing
+restoration, including its original frame delay.
+Versions 1–3 remain supported.
+
+Adventure sound records may include `fizzle: true`. The renderer captures the
+previous map before applying that projection, then runs the original eight-frame
+fade and sound together. A missing flag means sound only. Event IDs suppress
+duplicates, and reconnect establishes a watermark without replaying past fades.
 
 The `calendar` choice is an informational acknowledgement with the original
 localized week/month text. Its native presentation follows time/town events and
