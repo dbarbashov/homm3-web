@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {test} from 'node:test';
 const source=fs.readFileSync(new URL('../web/site/authority-game.js',import.meta.url),'utf8');
-function client(clock=Date,ready={},presentationClock){
+function client(clock=Date,ready={}){
   const window={homm3Network:{self:'a',host:'a'}},sent=[];
   vm.runInNewContext(source,{window,Date:clock,Number,Array,Map,Error});
-  const api=window.homm3Authority;api.start(m=>sent.push(m),presentationClock);
+  const api=window.homm3Authority;api.start(m=>sent.push(m));
   api.receive({type:'authority_ready',generation:'g1',actor:0,...ready});api.nativeReady('maps/trusted.h3m',Array(41).fill(0));
   const receive=m=>api.receive({generation:'g1',...m});
   const state=(revision=0)=>receive({type:'authority_state',schema:1,actor:0,revision,words:[1,0,0,1,1,1,36,1,...Array(13).fill(0)]});
@@ -133,10 +133,14 @@ test('server Auto Combat waits for a rendered step and queues Stop across an in-
   let now=1000;const {api,receive,sent}=client({now:()=>now});
   const data={...battle([{id:0,action:103,hex:-1,extra:-1,hex2:-1},{id:1,action:104,hex:-1,extra:-1,hex2:-1}]),autoCombat:true};
   receive({type:'authority_choice',actor:0,token:110,kind:'combat',options:[0,1],data});api.takeCombat(new Int32Array(api.combatLength()),0);
-  assert.equal(api.combatAutoStep(),false);now+=80;assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).value,0);
+  assert.equal(api.combatAutoStep(),false);api.rendererReady(true);api.presentationBusy(true);
+  now+=1000;assert.equal(api.combatAutoStep(),false);api.presentationBusy(false);
+  assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).value,0);
+  assert.equal(api.combatAutoStep(),false); // one command per decision token
+
   assert.equal(api.combatToggleAuto(),true);
   receive({type:'authority_choice',actor:0,token:111,kind:'combat',options:[0,1],data});api.takeCombat(new Int32Array(api.combatLength()),0);
-  now+=80;assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).token,111);assert.equal(sent.at(-1).value,1);
+  assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).token,111);assert.equal(sent.at(-1).value,1);
 });
 test('battle names preserve original bytes and unavailable Auto Combat stays disabled',()=>{
   const {api,receive}=client();const data=battle([{id:0,action:3,hex:-1,extra:-1,hex2:-1}]);data.heroes[0].nameBytes=[224,225];
@@ -400,11 +404,11 @@ test('older relay current choice already queued replaces its stale opening on a 
   const words=new Int32Array(api.combatLength());api.takeCombat(words,0);assert.equal(words[0],4);
 });
 
-test('injected presentation time controls autobattle independently of wall time',()=>{
-  let virtual=1000,wall=10000;const {api,receive,sent}=client({now:()=>wall},{},()=>virtual);
+test('wall-clock jumps cannot start Auto before the renderer is ready',()=>{
+  let now=1000;const {api,receive}=client({now:()=>now});
   const data={...battle([{id:0,action:103,hex:-1,extra:-1,hex2:-1}]),autoCombat:true};
-  receive({type:'authority_choice',actor:0,token:210,kind:'combat',options:[0],data});
-  api.takeCombat(new Int32Array(api.combatLength()),0);wall+=100000;
-  assert.equal(api.combatAutoStep(),false);virtual+=79;assert.equal(api.combatAutoStep(),false);
-  virtual+=1;assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).token,210);
+  receive({type:'authority_choice',actor:0,token:801,kind:'combat',options:[0],data});api.takeCombat(new Int32Array(api.combatLength()),0);
+  now+=100000;assert.equal(api.combatAutoStep(),false);
+  api.rendererReady(true);now=0;assert.equal(api.combatAutoStep(),true);
+  assert.equal(api.combatAutoStep(),false);
 });
