@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {buildOfflineWorker, shellFiles, optionalCSS} from './lib/offline-shell.mjs';
 import net from 'node:net';
 import { networkInterfaces, hostname } from 'node:os';
 import path from 'node:path';
@@ -22,6 +23,7 @@ const allowedHosts = new Set(['127.0.0.1', 'localhost', ...lanAddresses, hostnam
 const mime = { '.webp': 'image/webp', '.png': 'image/png', '.ico': 'image/x-icon', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
 const staticFiles = new Set(['site/crest.webp', 'site/ui-leather.webp', 'site/ui-gold.webp', 'favicon.ico', 'site/favicon.png', 'site/site.css', 'site/fonts.css', 'site/skin.css', 'site/mobile.css', 'site/mobile.js', 'site/touch.js', 'site/report-bug.js', 'site/telemetry.js', 'site/privacy.html', 'site/game.webmanifest', 'site/assets.js', 'site/video-archive.js', 'site/resources.json', 'site/replay.html', 'site/replay.js', 'site/replay-client.js', 'site/device-access.js', 'site/rooms.js', 'site/fast-game.js', 'site/authority-game.js', 'site/status.html', 'site/credits.html', 'index.html', 'port/index.html', 'port/boot.js', 'port/sha256.js', 'port/music.js', 'port/sfx.js', 'port/homm3.js', 'port/homm3.wasm', 'port/status.html', 'port/game.html', 'port/game.js', 'port/game.wasm']);
 
+for (const file of shellFiles) staticFiles.add(file);
 const server = http.createServer(async (req, res) => {
   const send = (status, body, type = 'application/octet-stream') => {
     res.writeHead(status, { 'Content-Type': type, 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
@@ -37,6 +39,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'GET') return send(405, 'GET only');
     const url = new URL(req.url, 'http://127.0.0.1');
     const route = decodeURIComponent(url.pathname);
+    if (route === '/offline-worker.js') return send(200, await buildOfflineWorker(root), 'text/javascript; charset=utf-8');
     if (route === '/api/catalog') return send(200, JSON.stringify({ ready: !!installation, error: setupError, maps: installation?.maps || [], campaigns: installation?.campaigns || [], videos: [...(installation?.videos?.keys() || [])], music: installation?.music || [], archives: installation?.archives || [], soundArchives: installation?.soundArchives || [], resources: installation?.entries.size || 0 }), 'application/json');
     if (route.startsWith('/api/')) {
       if (!installation) return send(503, 'Configure .local/game.json with gameRoot first');
@@ -70,7 +73,7 @@ const server = http.createServer(async (req, res) => {
     }
     const filename = route === '/' ? 'index.html' : ['/port', '/port/'].includes(route) ? 'port/index.html' : route.slice(1);
     if (['site/fonts.css', 'site/skin.css'].includes(filename)) {
-      return send(200, await readFile(path.join(root,'web',filename)).catch(()=>Buffer.from('/* Optional original UI assets. */')), 'text/css');
+      return send(200, await readFile(path.join(root,'web',filename)).catch(()=>Buffer.from(optionalCSS)), 'text/css');
     }
     if (!staticFiles.has(filename)) return send(404, 'Not found');
     send(200, await readFile(path.join(root, 'web', filename)), mime[path.extname(filename)]);

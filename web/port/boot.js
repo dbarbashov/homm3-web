@@ -49,7 +49,7 @@ async function refreshCatalog() {
   start.textContent = 'Играть'; start.disabled = false;
   status.textContent = `Ресурсы готовы · ${Math.round(size / 1024 / 1024)} МБ`;
   const hint = document.querySelector('#source-hint');
-  if (hint) hint.textContent = 'Ваша установка найдена. Можно отправляться в путь.';
+  if (hint) hint.textContent = catalog.offline ? 'Игра сохранена на этом устройстве. Интернет не нужен.' : 'Ваша установка найдена. Можно отправляться в путь.';
 }
 window.addEventListener('homm3-assets-selected', () => { if(runtimeReady && !prepared && !preparing) refreshCatalog().catch(e => status.textContent = e.message); });
 window.Module = {
