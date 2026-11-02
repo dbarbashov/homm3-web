@@ -5,6 +5,11 @@ const ACTIVE = '/__homm3_offline_active__';
 const DRAFT = '/__homm3_offline_draft__';
 const RECORD = '/__homm3_offline_record__';
 let pinned;
+const requestKey = value => {
+  const url=new URL(value,globalThis.location?.href || 'https://offline.invalid/');
+  return url.pathname+url.search;
+};
+export function resetInstalled() { pinned=null; }
 const hex = data=>Array.from(new Uint8Array(data),b=>b.toString(16).padStart(2,'0')).join('');
 const digest = async data=>hex(await crypto.subtle.digest('SHA-256',data));
 const urlFor = (kind,name)=>'/api/'+kind+'?name='+encodeURIComponent(name);
@@ -30,15 +35,17 @@ export async function installed() {
   if (!record) return null;
   if (!await caches.has(record.cache)) return {...record,complete:false};
   const cache=await caches.open(record.cache);
-  const keys=new Set((await cache.keys()).map(r=>new URL(r.url).pathname+new URL(r.url).search));
-  return {...record,complete:record.entries.every(e=>keys.has(e.url))};
+  // CacheStorage serializes URL query apostrophes as %27. Compare serialized
+  // requests on BOTH sides, including metadata written by older installations.
+  const keys=new Set((await cache.keys()).map(r=>requestKey(r.url)));
+  return {...record,complete:record.entries.every(e=>keys.has(requestKey(e.url)))};
 }
 export async function fetchInstalled(url) {
   // Freeze one resource generation for the lifetime of a document/game.
-  if (!pinned) pinned=installed().catch(()=>null);
-  const record=await pinned;
+  const record=pinned || await installed().catch(()=>null);
   if (!record) return null;
-  if (!record.complete) throw new Error('Офлайн-файлы удалены браузером. Откройте «Игра без интернета» и подготовьте их заново.');
+  if (!record.complete) throw new Error('Офлайн-файлы удалены браузером. Откройте меню игры → «Без интернета» и восстановите копию.');
+  pinned=record; // Never memoize a missing/incomplete installation.
   if (url.pathname==='/api/catalog') return Response.json({...record.catalog,offline:true,ready:true});
   const key=urlFor(url.pathname.slice(5),url.searchParams.get('name')||'');
   const entry=record.entries.find(e=>e.url.toLowerCase()===key.toLowerCase());

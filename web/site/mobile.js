@@ -48,7 +48,7 @@
   function closeControls(){ $('view-actions').hidden=true;$('view-toggle').setAttribute('aria-expanded','false'); }
   function menuPage(settings=false){$('menu-main').hidden=settings;$('menu-settings').hidden=!settings;}
   $('view-toggle').onclick=()=>{
-    syncPlayerTheme();const open=$('view-actions').hidden;menuPage();window.homm3Lobby?.close();
+    syncPlayerTheme();$('view-offline').hidden=!!window.homm3Room;const open=$('view-actions').hidden;menuPage();window.homm3Lobby?.close();
     $('view-actions').hidden=!open;$('view-toggle').setAttribute('aria-expanded',String(open));
   };
   $('view-resume').onclick=()=>{closeControls();canvas.focus({preventScroll:true});};

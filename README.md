@@ -9,9 +9,10 @@ The engine revision used by the client is recorded in `engine.lock.json`.
 
 ## Play offline
 
-Open **Игра без интернета** from the home page. Select your Heroes III Complete
+Open **Одиночная игра**, then the compact game menu → **Без интернета**.
+Preparation opens inside the game; it never navigates away from the current party. Select your Heroes III Complete
 folder if needed, choose whether to include campaign videos, and press
-**Подготовить офлайн**. Wait for the ready status before disconnecting.
+**Сохранить на устройстве**. Wait for the ready status before disconnecting.
 The browser stores the application, maps, campaigns, sounds and music locally.
 Interrupted preparation resumes completed files when retried with the same source.
 No game resources are uploaded.
