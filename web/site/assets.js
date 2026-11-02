@@ -40,6 +40,10 @@
       files = selected;
       window.dispatchEvent(new Event('homm3-assets-selected'));
     },
+    async refreshInstalled() {
+      const {resetInstalled}=await import('/site/offline-store.js');
+      resetInstalled();
+    },
     async source() {
       const selected = files, videos = videoEntries;
       const get = (url, options) => fetchSource(url, options, selected, videos);
