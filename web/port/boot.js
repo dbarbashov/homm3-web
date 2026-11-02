@@ -42,7 +42,7 @@ async function refreshCatalog() {
   start.textContent = 'Играть'; start.disabled = false;
   status.textContent = `Ресурсы готовы · ${Math.round(size / 1024 / 1024)} МБ`;
   const hint = document.querySelector('#source-hint');
-  if (hint) hint.textContent = 'Ваша установка найдена. Можно отправляться в путь.';
+  if (hint) hint.textContent = catalog.offline ? 'Игра сохранена на этом устройстве. Интернет не нужен.' : 'Ваша установка найдена. Можно отправляться в путь.';
 }
 window.addEventListener('homm3-assets-selected', () => { if(runtimeReady && !prepared && !preparing) refreshCatalog().catch(e => status.textContent = e.message); });
 window.Module = {
@@ -135,7 +135,13 @@ function runGame(network=false) {
   running = true; window.dispatchEvent(new Event('homm3-running')); document.querySelector('#launch-cover')?.setAttribute('hidden','');
   Module.callMain(fullGame ? ['/runtime', ...(['authority-restore','authority-setup'].includes(network) ? ['--'+network] : network ? ['--network'] : [])] : ['/data/']);
 }
-window.homm3Boot = { prepare, run: runGame, fail: failEngine, get running() { return running; }, get ready() { return runtimeReady; } };
+async function refreshAssets() {
+  if (!runtimeReady || prepared || preparing || running) return;
+  await window.homm3Assets?.refreshInstalled?.();
+  await refreshCatalog();
+}
+window.addEventListener('focus', () => { if (!catalog?.ready) refreshAssets().catch(()=>{}); });
+window.homm3Boot = { prepare, refreshAssets, run: runGame, fail: failEngine, get running() { return running; }, get ready() { return runtimeReady; } };
 start.addEventListener('click', async () => {
   if (exited) { location.reload(); return; }
   try { await prepare(); runGame(); } catch(error) { status.textContent = error.message; start.textContent = 'Перезагрузите страницу для повтора'; }
@@ -147,7 +153,7 @@ window.addEventListener('homm3-ready', () => {
   const d = window.homm3PortDiagnostics;
   status.textContent = `${labels[d.screen] || d.screen} · мышь и горячие клавиши · правая кнопка: подсказка`;
   document.querySelector('#hash').textContent = `Кадр ${d.framebufferFNV1a}`;
-  if (!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) canvas.focus();
+  if (!document.querySelector('dialog[open]') && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) canvas.focus();
 });
 window.addEventListener('homm3-command', event => {
   window.homm3PortDiagnostics.commands.push(event.detail);

@@ -1,4 +1,4 @@
-/* An explicitly selected installation stays in browser memory; never uploaded. */
+/* Selected files stay on device. Offline installation is a separate explicit action. */
 (() => {
   let files = null, videoEntries = new Map();
   const nativeFetch = window.fetch.bind(window);
@@ -16,7 +16,7 @@
       if (base.protocol !== 'https:' && !['localhost','127.0.0.1','[::1]'].includes(base.hostname)) throw new Error('Ресурсам требуется HTTPS');
       if (!base.pathname.endsWith('/')) throw new Error('Некорректный адрес ресурсов');
       return {...config, baseUrl:base.href, fileLookup:new Map(Object.entries(config.files).map(([name,file])=>[name.toLowerCase(),file]))};
-    })();
+    })().catch(error=>{remoteConfig=null;throw error;});
     return remoteConfig;
   }
   window.homm3Assets = {
@@ -40,7 +40,32 @@
       files = selected;
       window.dispatchEvent(new Event('homm3-assets-selected'));
     },
+    async refreshInstalled() {
+      const {resetInstalled}=await import('/site/offline-store.js');
+      resetInstalled();
+    },
+    async source() {
+      const selected = files, videos = videoEntries;
+      const get = (url, options) => fetchSource(url, options, selected, videos);
+      const response = await get('/api/catalog');
+      if (!response.ok) throw new Error('Ресурсы недоступны');
+      const catalog = await response.json();
+      const config = selected ? null : await remote();
+      return {catalog, fetch:get, hashes:config?.files || {},
+        identity:selected ? [...selected].map(([n,f])=>[n,f.size,f.lastModified]) : config?.files || catalog};
+    },
     async fetch(url, options) {
+      const u = new URL(url, location.href);
+      if (!files && u.origin===location.origin && assetPaths.includes(u.pathname)) {
+        const {fetchInstalled} = await import('/site/offline-store.js');
+        const saved = await fetchInstalled(u);
+        if (saved) return saved;
+      }
+      return fetchSource(url, options, files, videoEntries);
+    }
+  };
+  const assetPaths = ['/api/catalog','/api/archive','/api/scenario','/api/music','/api/video'];
+  async function fetchSource(url, options, files, videoEntries) {
       const u = new URL(url, location.href);
       if (!files && u.origin === location.origin && ['/api/catalog','/api/archive','/api/scenario','/api/music','/api/video'].includes(u.pathname)) {
         const config = await remote();
@@ -54,7 +79,7 @@
           return nativeFetch(new URL(file, config.baseUrl), {...options,mode:'cors',credentials:'omit'});
         }
       }
-      if (!files) return nativeFetch(url, options);
+      if (!files || u.origin !== location.origin) return nativeFetch(url, options);
       if (u.pathname === '/api/catalog') {
         const all = [...files.values()];
         const archives = required.map(n => ({name:files.get(n).name,bytes:files.get(n).size}));
@@ -70,8 +95,7 @@
         return file ? new Response(file) : new Response('Файл не найден',{status:404});
       }
       return nativeFetch(url, options);
-    }
-  };
+  }
   input?.addEventListener('change', async () => {
     try { await window.homm3Assets.select(input.files); }
     catch(error) { document.querySelector('#status').textContent = error.message; }
