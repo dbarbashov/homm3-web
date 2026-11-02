@@ -19,7 +19,7 @@ if hashlib.sha256(args.ffmpeg_source.read_bytes()).hexdigest() != '6136812ea6d4e
     parser.error('FFmpeg source checksum mismatch')
 subprocess.run([sys.executable, str(root / 'scripts/engine-client.py'), 'verify'], check=True)
 files = ['favicon.ico', 'index.html']
-files += ['site/' + name for name in ['crest.webp', 'ui-leather.webp', 'ui-gold.webp', 'favicon.png', 'site.css', 'mobile.css', 'mobile.js', 'touch.js', 'report-bug.js', 'telemetry.js', 'privacy.html', 'game.webmanifest', 'assets.js', 'video-archive.js', 'rooms.js', 'fast-game.js', 'authority-game.js', 'credits.html', 'resources.json', 'offline.html', 'offline.css', 'offline.js', 'offline-store.js', 'offline-register.js']]
+files += ['site/' + name for name in ['crest.webp', 'ui-leather.webp', 'ui-gold.webp', 'favicon.png', 'site.css', 'mobile.css', 'mobile.js', 'touch.js', 'report-bug.js', 'telemetry.js', 'privacy.html', 'game.webmanifest', 'assets.js', 'video-archive.js', 'replay.html', 'replay.js', 'replay-client.js', 'device-access.js', 'rooms.js', 'fast-game.js', 'authority-game.js', 'credits.html', 'resources.json', 'offline.html', 'offline.css', 'offline.js', 'offline-store.js', 'offline-register.js']]
 files += ['port/' + name for name in ['game.html', 'game.js', 'game.wasm', 'engine-build.json', 'boot.js', 'sha256.js', 'music.js', 'sfx.js']]
 output = root / '.local/deploy'
 output.mkdir(parents=True, exist_ok=True)

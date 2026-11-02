@@ -30,6 +30,17 @@ test('same-revision choice projection is installed before the original dialog op
   const fields=new Int32Array(16),text=new Uint8Array(20);
   assert.equal(api.takeChoice(fields,0,text,20),0);apply();assert.equal(api.takeChoice(fields,0,text,20),1);assert.equal(text[0],224);
 });
+test('calendar acknowledgement keeps its identity and waits for the day projection',()=>{
+  const {api,receive,state,apply,sent}=client();state(1);
+  receive({type:'authority_choice',actor:0,token:5,kind:'calendar',text:'New week',options:[30725],data:{}});
+  const fields=new Int32Array(16),text=new Uint8Array(32);
+  assert.equal(api.pendingChoice.kind,'calendar');
+  assert.equal(api.takeChoice(fields,0,text,32),0);apply();
+  assert.equal(api.takeChoice(fields,0,text,32),17);
+  assert.deepEqual(Array.from(fields.slice(0,11)),[17,1,-1,-1,0,-1,0,-1,0,-1,-1]);
+  assert.equal(api.answer(30725),true);assert.equal(sent.at(-1).token,5);
+  assert.equal(api.takeChoice(fields,0,text,32),0);
+});
 test('late packets from other generations cannot change the world or dismiss a request',()=>{
   const {api,receive,sent}=client();const id=api.send(5);
   assert.equal(receive({generation:'old',type:'authority_result',id:sent.find(m=>m.type==='authority_command').id,ok:false}),false);assert.equal(api.result(id),0);
@@ -133,10 +144,14 @@ test('server Auto Combat waits for a rendered step and queues Stop across an in-
   let now=1000;const {api,receive,sent}=client({now:()=>now});
   const data={...battle([{id:0,action:103,hex:-1,extra:-1,hex2:-1},{id:1,action:104,hex:-1,extra:-1,hex2:-1}]),autoCombat:true};
   receive({type:'authority_choice',actor:0,token:110,kind:'combat',options:[0,1],data});api.takeCombat(new Int32Array(api.combatLength()),0);
-  assert.equal(api.combatAutoStep(),false);now+=80;assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).value,0);
+  assert.equal(api.combatAutoStep(),false);api.rendererReady(true);api.presentationBusy(true);
+  now+=1000;assert.equal(api.combatAutoStep(),false);api.presentationBusy(false);
+  assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).value,0);
+  assert.equal(api.combatAutoStep(),false); // one command per decision token
+
   assert.equal(api.combatToggleAuto(),true);
   receive({type:'authority_choice',actor:0,token:111,kind:'combat',options:[0,1],data});api.takeCombat(new Int32Array(api.combatLength()),0);
-  now+=80;assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).token,111);assert.equal(sent.at(-1).value,1);
+  assert.equal(api.combatAutoStep(),true);assert.equal(sent.at(-1).token,111);assert.equal(sent.at(-1).value,1);
 });
 test('battle names preserve original bytes and unavailable Auto Combat stays disabled',()=>{
   const {api,receive}=client();const data=battle([{id:0,action:3,hex:-1,extra:-1,hex2:-1}]);data.heroes[0].nameBytes=[224,225];
@@ -361,10 +376,20 @@ test('versioned impact, morale and luck journal reaches native replay in order',
   assert.equal(api.combatPresentationVersion,2);assert.equal(api.fatal,false);
 });
 test('unknown journal version and invalid effect payloads fail closed',()=>{
-  for(const [version,kind,args] of [[3,1,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
+  for(const [version,kind,args] of [[6,1,[0,0,0,0]],[4,16,[2,0,0,0]],[3,16,[1,0,0,0]],[4,18,[0,0,0,0]],[3,17,[0,0,0,0]],[3,15,[150,0,0,0]],[4,15,[0,0,0,0]],[4,15,[10001,0,0,0]],[2,13,[2,0,0,0]],[3,13,[0,0,0,0]],[3,13,[2,2,0,0]],[3,14,[-1,0,0,0]],[3,14,[1,0,0,0]],[3,14,[45,0,0,0]],[2,14,[0,0,0,0]],[1,10,[1,0,0,0]],[2,10,[2,0,0,0]],[2,12,[-2,1,0,0]],[2,12,[-1,1,-1,0]],[2,12,[-1,1,2097152,0]]]){
     const {api,receive}=client();const data={...battle([]),canAct:false};data.presentationVersion=version;data.presentation=[[1,kind,0,0,86,1,...args,0,0]];
     receive({type:'authority_combat_state',actor:0,revision:0,data});assert.equal(api.combatLength(),0);assert.equal(api.fatal,true);
   }
+});
+
+test('round boundaries survive the version 3 presentation bridge',()=>{
+  const {api,receive}=client();const data={...battle([]),canAct:false,presentationVersion:3};
+  data.presentation=[[1,13,0,0,86,1,2,0,0,0,0,0],[2,14,0,0,86,1,0,-120,340,-2147483648,0,5]];
+  receive({type:'authority_combat_state',actor:0,revision:0,data});
+  const words=new Int32Array(api.combatLength());api.takeCombat(words,0);
+  assert.equal(api.combatPresentationVersion,3);
+  assert.deepEqual(Array.from(words.slice(-24)),data.presentation.flat());
+  assert.equal(api.fatal,false);
 });
 
 test('fresh page waits for current owner choice instead of replaying a cached opening',()=>{
@@ -398,4 +423,49 @@ test('older relay current choice already queued replaces its stale opening on a 
   receive({type:'authority_combat_state',actor:0,revision:0,data:{...battle([]),canAct:false}});
   receive({type:'authority_choice',actor:0,token:9,kind:'combat',options:[0],data:{...battle([{id:0,action:3,hex:-1,extra:-1,hex2:-1}]),round:4}});
   const words=new Int32Array(api.combatLength());api.takeCombat(words,0);assert.equal(words[0],4);
+});
+
+test('wall-clock jumps cannot start Auto before the renderer is ready',()=>{
+  let now=1000;const {api,receive}=client({now:()=>now});
+  const data={...battle([{id:0,action:103,hex:-1,extra:-1,hex2:-1}]),autoCombat:true};
+  receive({type:'authority_choice',actor:0,token:801,kind:'combat',options:[0],data});api.takeCombat(new Int32Array(api.combatLength()),0);
+  now+=100000;assert.equal(api.combatAutoStep(),false);
+  api.rendererReady(true);now=0;assert.equal(api.combatAutoStep(),true);
+  assert.equal(api.combatAutoStep(),false);
+});
+
+ test('version 4 preserves unscaled combat pauses for client speed',()=>{
+  const {api,receive}=client();const data={...battle([]),canAct:false,presentationVersion:4};
+  data.presentation=[[1,15,0,0,86,1,150,0,0,0,0,0]];
+  receive({type:'authority_combat_state',actor:0,revision:0,data});
+  const words=new Int32Array(api.combatLength());api.takeCombat(words,0);
+  assert.equal(api.combatPresentationVersion,4);
+  assert.deepEqual(Array.from(words.slice(-12)),data.presentation.flat());
+  assert.equal(api.fatal,false);
+});
+
+test('fizzle cues preserve typed transitions and skip replayed history',()=>{
+  const {api,receive,apply}=client();
+  const update=sounds=>receive({type:'authority_state',schema:1,actor:0,revision:0,words:[1,0,0,1,1,1,36,1,...Array(13).fill(0)],adventureSounds:sounds});
+  const sounds=[{id:1,name:'killfade.82M',fizzle:true}];
+  update(sounds);assert.equal(api.pendingAdventureFizzle,true);apply();
+  assert.equal(api.pendingAdventureFizzle,false);
+  const bytes=new Uint8Array(81);assert.equal(api.takeAdventureSound(bytes,81),2);
+  assert.equal(new TextDecoder().decode(bytes.slice(0,bytes.indexOf(0))),'killfade.82M');
+  update(sounds);assert.equal(api.pendingAdventureFizzle,false);apply();
+  assert.equal(api.takeAdventureSound(bytes,81),0);
+  update([{id:2,name:'pickup01.82M',fizzle:'yes'}]);apply();assert.equal(api.fatal,true);
+});
+
+// Spell announcements follow actual engine calls; damage-only spells do not
+// synthesize an extra announcement. Validate both single and mass targets.
+test('version 5 preserves original spell messages and rejects invalid targets',()=>{
+  for(const args of [[53,0,0,0,1,0],[53,0,1,-1,-1,0],[81,0,0,0,1,0],[53,3,0,0,1,0],[53,0,2,0,1,0],[53,0,0,-1,1,0],[53,0,0,0,-1,0],[53,0,0,2,1,0],[53,0,0,0,21,0]]){
+    const {api,receive}=client();const data={...battle([]),canAct:false,presentationVersion:5};
+    data.presentation=[[1,18,0,0,86,1,...args]];
+    receive({type:'authority_combat_state',actor:0,revision:0,data});
+    const valid=args[0]===53&&args[1]===0&&args[2]<2&&((args[3]===0&&args[4]===1)||(args[3]===-1&&args[4]===-1));
+    const length=api.combatLength();assert.equal(api.fatal,!valid);
+    if(valid){const words=new Int32Array(length);api.takeCombat(words,0);assert.deepEqual(Array.from(words.slice(-12)),data.presentation[0]);}
+  }
 });
