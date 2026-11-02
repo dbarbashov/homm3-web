@@ -6,6 +6,7 @@ const progress = document.querySelector('#progress');
 const fullGame = location.pathname.endsWith('/game.html');
 let catalog;
 let archives;
+let catalogRequest = 0;
 let exited = false;
 let prepared = false, preparing = null, runtimeReady = false, running = false, filesystemCreated = false;
 function failEngine(message) {
@@ -27,9 +28,15 @@ function failEngine(message) {
 window.addEventListener('homm3-engine-error', event => failEngine(event.detail));
 const assetFetch = (...args) => (window.homm3Assets?.fetch || fetch)(...args);
 async function refreshCatalog() {
+  const request = ++catalogRequest;
   const response = await assetFetch('/api/catalog');
+  if (request !== catalogRequest) return;
   if (!response.ok) throw new Error('Сервер ресурсов недоступен');
-  catalog = await response.json();
+  const value = await response.json();
+  // Selecting local files supersedes an earlier remote catalog request.
+  // Its late response must not replace the installation being prepared.
+  if (request !== catalogRequest) return;
+  catalog = value;
   window.homm3VideoNames = new Set((catalog.videos || []).map(n=>n.toLowerCase()));
   window.homm3Music?.configure(catalog.music || []);
   if (!catalog.ready) {

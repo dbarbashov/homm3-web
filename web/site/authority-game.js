@@ -17,7 +17,7 @@
   const uiEvents=[], seenUIResults=new Set(), answers=new Map();let choiceError='';
   const notices=[],seenNotices=new Set();let showingNotice=null;
   const adventureSounds=[];let lastAdventureSound=0;
-  const combatResults=[], seenCombatResults=new Set();let currentCombatResult=null, preparedCombatResult=false, combatEnded=false, combatView=null, combatPresentedAt=0, combatStopRequested=false, combatRendererIsReady=false;
+  const combatResults=[], seenCombatResults=new Set();let currentCombatResult=null, preparedCombatResult=false, combatEnded=false, combatView=null, combatStopRequested=false, combatRendererIsReady=false;
   let combatAnimating=false, combatOpening=null, preparedOpening=false;
   let restoringOwnChoice=false, freshCombatResume=false;
   let battleRevision=-1, combatPacket=null, heldSpell=null, combatObservation=null, combatPreparedChoice=false;
@@ -176,8 +176,8 @@
     applied() {
       if (!copying) {fail('Projection acknowledgement without state');return;}
       for(const sound of copying.adventureSounds||[]){
-        if(!Number.isSafeInteger(sound.id)||sound.id<1||typeof sound.name!=='string'||!/^[-A-Za-z0-9_.]{1,80}$/.test(sound.name)){fail('Invalid adventure sound');return;}
-        if(sound.id>lastAdventureSound){if(appliedRevision>=0)adventureSounds.push(sound.name);lastAdventureSound=sound.id;}
+        if(!Number.isSafeInteger(sound.id)||sound.id<1||typeof sound.name!=='string'||!/^[-A-Za-z0-9_.]{1,80}$/.test(sound.name)||(sound.fizzle!==undefined&&typeof sound.fizzle!=='boolean')){fail('Invalid adventure sound');return;}
+        if(sound.id>lastAdventureSound){if(appliedRevision>=0)adventureSounds.push(sound);lastAdventureSound=sound.id;}
       }
       if(adventureSounds.length>128){fail('Adventure sound queue overflow');return;}
       for(const notice of copying.notices||[]){
@@ -189,10 +189,11 @@
       const activeActor=copying.words[2],eliminated=!!copying.eliminated,finished=!!copying.finished;appliedRevision=copying.revision;copying=null;
       window.homm3AuthorityStatus={...window.homm3AuthorityStatus,error:false,message:'',revision:appliedRevision,actor,activeActor,eliminated,finished,outcome};
     },
+    get pendingAdventureFizzle(){return !stopped&&appliedRevision>=0&&!!packet?.adventureSounds?.some(s=>s.id>lastAdventureSound&&s.fizzle===true);},
     takeAdventureSound(bytes,capacity) {
       if(stopped||packet||copying||!adventureSounds.length)return 0;
-      const name=adventureSounds[0];if(capacity<=name.length)return 0;
-      adventureSounds.shift();for(let i=0;i<name.length;++i)bytes[i]=name.charCodeAt(i);bytes[name.length]=0;return 1;
+      const {name,fizzle}=adventureSounds[0];if(capacity<=name.length)return 0;
+      adventureSounds.shift();for(let i=0;i<name.length;++i)bytes[i]=name.charCodeAt(i);bytes[name.length]=0;return fizzle?2:1;
     },
     result(ticket) {
       const request=requests.get(String(ticket));
@@ -205,10 +206,11 @@
     },
     takeChoice(heap, offset, text, capacity, fieldsCapacity=16) {
       if (!choice || presenting || packet || copying || appliedRevision<0 || combatResults.length || currentCombatResult) return 0;
-      if (!['normal','level_up','recruit','university','army_exchange','world_view','market','hill_fort','map_tavern','sacrifice','guild','hero_exchange','puzzle','shipyard'].includes(choice.kind)) {if(!['combat','combat_spell'].includes(choice.kind))fail('Unknown authoritative choice: '+choice.kind);return 0;}
+      if (!['normal','calendar','level_up','recruit','university','army_exchange','world_view','market','hill_fort','map_tavern','sacrifice','guild','hero_exchange','puzzle','shipyard'].includes(choice.kind)) {if(!['combat','combat_spell'].includes(choice.kind))fail('Unknown authoritative choice: '+choice.kind);return 0;}
       presenting=choice;choice=null;
       const d=presenting.data || {};let fields;
       if (presenting.kind==='normal') fields=Array.isArray(d.icons)&&d.icons.length>3?[11]:[1,d.mbType??1,d.special??-1,...Array.from({length:3},(_,i)=>d.icons?.[i]||[-1,0]).flat(),d.x??-1,d.y??-1];
+      else if(presenting.kind==='calendar') fields=[17,1,-1,-1,0,-1,0,-1,0,-1,-1];
       else if(presenting.kind==='level_up') fields=[2,d.hero,d.primary,...(d.skills||[])];
       else if(presenting.kind==='recruit'){
         if(!Array.isArray(d.creatures)||d.creatures.length<1||d.creatures.length>4){fail('Invalid recruitment offers');return 0;}
@@ -265,7 +267,7 @@
       for(const o of d.obstacles){out.push(o.hex,o.owner,o.duration,o.sprite.length);for(const ch of o.sprite)out.push(ch.charCodeAt(0));}
       out.push(d.cells.length);for(const cell of d.cells){if(cell.length!==49){fail('Invalid combat cell');return 0;}out.push(...cell);}
       const events=d.presentation||[];
-      if(![1,2].includes(d.presentationVersion??1)||!Array.isArray(events)||events.length>256||!events.every((e,i)=>Array.isArray(e)&&e.length===12&&e.every(i32)&&e[0]>0&&(i===0||e[0]===events[i-1][0]+1)&&e[1]>=1&&e[1]<=((d.presentationVersion??1)===2?12:9)&&(e[1]!==9||(e[6]>=0&&e[6]<81))&&(e[1]!==10||(e[6]===0||e[6]===1))&&(e[1]!==12||(e[6]>=-1&&e[6]<83&&(e[7]===0||e[7]===1)&&e[8]>=0&&e[8]<2097152&&e[9]>=0&&e[9]<2097152))&&e[2]>=0&&e[2]<=1&&e[3]>=0&&e[3]<21)){fail('Invalid battle presentation journal');return 0;}
+      if(![1,2,3,4,5].includes(d.presentationVersion??1)||!Array.isArray(events)||events.length>256||!events.every((e,i)=>Array.isArray(e)&&e.length===12&&e.every(i32)&&e[0]>0&&(i===0||e[0]===events[i-1][0]+1)&&e[1]>=1&&e[1]<=((d.presentationVersion??1)>=5?18:(d.presentationVersion??1)>=4?17:(d.presentationVersion??1)===3?14:(d.presentationVersion??1)===2?12:9)&&(e[1]!==18||(e[6]>=0&&e[6]<81&&e[7]>=0&&e[7]<=2&&e[8]>=0&&e[8]<=1&&((e[9]===-1&&e[10]===-1)||(e[9]>=0&&e[9]<=1&&e[10]>=0&&e[10]<21))))&&(e[1]!==16||(e[6]===0||e[6]===1))&&(e[1]!==15||(e[6]>0&&e[6]<=10000))&&(e[1]!==14||(e[6]>=0&&e[6]<=40&&e[6]%5===0))&&(e[1]!==13||(e[6]>=1&&e[6]<=1000000&&(e[7]===0||e[7]===1)))&&(e[1]!==9||(e[6]>=0&&e[6]<81))&&(e[1]!==10||(e[6]===0||e[6]===1))&&(e[1]!==12||(e[6]>=-1&&e[6]<83&&(e[7]===0||e[7]===1)&&e[8]>=0&&e[8]<2097152&&e[9]>=0&&e[9]<2097152))&&e[2]>=0&&e[2]<=1&&e[3]>=0&&e[3]<21)){fail('Invalid battle presentation journal');return 0;}
       out.push(events.length,...events.flat());
       if(out.length>65536 || !out.every(i32)){fail('Invalid battle integer');return 0;}
       combatPacket=out;combatView=d;return out.length;
@@ -276,7 +278,7 @@
       else if(preparedCombatResult){currentCombatResult=combatResults.shift();if(presenting?.kind==='combat')presenting=null;}
       else if(combatPreparedChoice){presenting=choice;choice=null;}else combatObservation=null;
       heap.set(combatPacket,offset);combatPacket=null;freshCombatResume=false;
-      combatPresentedAt=Date.now();combatEnded=false;if(battleRevision<0)battleRevision=appliedRevision;
+      combatEnded=false;if(battleRevision<0)battleRevision=appliedRevision;
     },
     get combatRendererReady(){return combatRendererIsReady;},
     get combatTactics(){return !!combatView?.tactics;},
@@ -288,7 +290,9 @@
     combatAuto(){return !!combatView?.autoCombat;},
     combatCanAuto(){return this.combatAuto()||!!combatView?.actions?.some(action=>action.action===103||action.action===104);},
     combatToggleAuto(){if(this.combatAuto()){combatStopRequested=true;if(this.combatCanAct()&&this.combatAction(104,-1,-1,-1)){combatStopRequested=false;return true;}return true;}return this.combatAction(103,-1,-1,-1);},
-    combatAutoStep(){if(this.combatAuto() && this.combatCanAct() && this.combatOffers(combatStopRequested?104:103) && Date.now()-combatPresentedAt>=80){const sent=this.combatAction(combatStopRequested?104:103,-1,-1,-1);if(sent)combatStopRequested=false;return sent;}return false;},
+    // The rendered decision and animation guard pace Auto; wall-clock sleeps
+    // add latency and are unnecessary because each token is consumed once.
+    combatAutoStep(){if(combatRendererIsReady && this.combatAuto() && this.combatCanAct() && this.combatOffers(combatStopRequested?104:103)){const sent=this.combatAction(combatStopRequested?104:103,-1,-1,-1);if(sent)combatStopRequested=false;return sent;}return false;},
     copyCombatSpellState(side,slot,heap,offset){const stack=combatView?.stacks?.find(s=>s.side===side&&s.slot===slot);if(!stack||!i32(stack.faerieDragonSpell)||!i32(stack.hasSpell))return 0;heap.set([stack.faerieDragonSpell,stack.hasSpell],offset);return 1;},
     copyCombatHeroName(side,bytes,capacity){const name=combatView?.heroes?.[side]?.nameBytes;if(!Array.isArray(name)||name.length>=capacity||!name.every(v=>i32(v)&&v>=0&&v<=255))return 0;bytes.set(name);bytes[name.length]=0;return 1;},
     combatResultLength(){

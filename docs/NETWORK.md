@@ -5,7 +5,52 @@ links, readiness, reconnect to a waiting lobby, and a persistent in-page chat
 panel. Each participant runs a separate WASM engine with its own local player
 and fog of war. There is no shared screen, remote input, or hot-seat substitute.
 
-## Architecture
+## Authoritative games
+
+In authoritative rooms, the service runs the rules and sends each participant
+only their permitted view. The browser submits commands and renders the original
+map, town, combat and dialog windows. Choice tokens bind answers to the current
+decision; the browser cannot submit arbitrary combat outcomes or world changes.
+See [durable games](durable-games.md) for recovery and report playback.
+
+Combat presentation journals contain ordered, 12-word records. The client reads
+versions 1–5. Version 2 adds morale, luck and synchronized impact effects; version
+3 adds event 13, the round boundary (`word[6]`: round number, `word[7]`: tactics
+flag), and event 14, resolved idle-animation delays. Event 14 packs five delays
+in words 7–11; word 6 is the starting index in the 42-slot stack array, and
+`INT32_MIN` marks an unchanged slot. Delays are relative to the presentation
+boundary, not server wall time. The rules RNG state is never sent to clients.
+These events restore the original round message, selector and idle timing
+between actions. Old journals remain readable. A reconnect installs the latest
+snapshot and its journal watermark without replaying completed actions.
+
+Version 4 adds event 15 for the original pause before retaliation or a second
+melee strike. Word 6 carries a positive duration in unscaled milliseconds
+(at most 10,000); the renderer applies its local combat speed. The service
+records the boundary without sleeping. This also preserves the frame-clock
+phase of subsequent luck effects. Event 16 restores a stack turn, with word 6
+selecting animated (1) or immediate (0) turning. Turns inside walking/flying
+are already part of those animations and are not journaled twice.
+Event 17 retains the final standing frame after a completed flight and facing
+restoration, including its original frame delay.
+Version 5 adds event 18 for an original spell announcement. Words 6–10 carry
+spell ID (0–80), caster kind (hero 0, creature 1, artifact 2), casting side,
+and target side/slot (both -1 for no target). Announcements are emitted only
+where the original spell implementation requests them. Damage-only spells
+retain their damage message without an invented extra casting line.
+Versions 1–4 remain supported.
+
+Adventure sound records may include `fizzle: true`. The renderer captures the
+previous map before applying that projection, then runs the original eight-frame
+fade and sound together. A missing flag means sound only. Event IDs suppress
+duplicates, and reconnect establishes a watermark without replaying past fades.
+
+The `calendar` choice is an informational acknowledgement with the original
+localized week/month text. Its native presentation follows time/town events and
+the new-turn map setup, including the calendar animation and week/month sample.
+Ordinary `normal` choices retain their existing order and appearance.
+
+## Legacy transport
 
 Browser UI → same-origin WebSocket → Rust Axum/Tokio room relay → other clients.
 The existing C++ `CDPlayHeroes`, `CNetMsg`, scenario selection, save transfer,
@@ -50,8 +95,7 @@ distributed attack. Rejections are private and preserve the user's draft.
 
 ## Local development and deployment
 
-The relay is a separate private repository. Maintainers may clone it next to this
-client as `../homm3-lobby`, or set `HOMM3_LOBBY_ROOT`. `npm start` starts it when
+To run a compatible relay locally, set `HOMM3_LOBBY_ROOT`. `npm start` starts it when
 present; otherwise the single-player client runs on its own. The development
 proxy expects the relay at `127.0.0.1:8784`.
 
@@ -92,7 +136,7 @@ omit campaign bytes while the reader expects them, killing the guest and leaving
 the host waiting at 98%. Native exceptions now show a reload screen and disconnect
 the failed client. An interrupted setup also shows an error to the other players.
 
-The relay's unit, isolation and capacity tests live with its private source.
+The relay implementation supplies its own unit, isolation and capacity tests.
 Full eight-player PvP, long sessions and recovery after a dropped match remain
 open validation areas. The relay verifies room membership and transport identity;
 it does not validate every legacy C++ game message or prevent cheating by clients.
