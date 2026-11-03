@@ -93,6 +93,8 @@ async function prepare() {
     if (fullGame) {
       Module.FS.mount(Module.IDBFS, {}, '/runtime/games');
       await new Promise((resolve, reject) => Module.FS.syncfs(true, error => error ? reject(error) : resolve()));
+      try { await import('/site/solo-cloud.js'); await window.homm3SoloMounted?.(); }
+      catch (error) { console.warn('Cloud saves unavailable:', error.message); }
     }
     const total = archives.reduce((n, a) => n + a.bytes, 0); let loaded = 0;
     for (const archive of archives) {
@@ -176,12 +178,18 @@ window.addEventListener('homm3-exit', () => {
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 let saveQueue = Promise.resolve();
-window.addEventListener('homm3-save', event => {
-  saveQueue = saveQueue.then(() => new Promise((resolve, reject) => {
+window.homm3PersistFiles = () => {
+  const task = saveQueue.catch(() => {}).then(() => new Promise((resolve, reject) => {
     Module.FS.syncfs(false, error => error ? reject(error) : resolve());
-  })).then(() => {
+  }));
+  saveQueue = task; return task;
+};
+window.addEventListener('homm3-save', event => {
+  let solo;
+  try { solo = window.homm3SoloSnapshot?.(event.detail); } catch (error) { console.warn(error); }
+  window.homm3PersistFiles().then(() => {
     window.homm3LastSave = event.detail;
-    window.dispatchEvent(new Event('homm3-save-persisted'));
+    window.dispatchEvent(new CustomEvent('homm3-save-persisted', {detail: {path:event.detail,solo}}));
   }).catch(error => { status.textContent = 'Не удалось записать сохранение в браузер: ' + error.message; });
 });
 
