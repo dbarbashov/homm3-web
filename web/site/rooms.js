@@ -366,6 +366,13 @@
   }
   $('close-tavern').onclick=closeTavern;
   window.homm3Lobby={open:openTavern,close:closeTavern,leaveToHome,
+    adoptSoloIdentity(identity){
+      if(room)return;
+      clearTimeout(reconnect);const old=socket;socket=null;old?.close();connecting=null;me=null;
+      token=identity.token;nickname=identity.name;
+      write('localStorage','homm3.session',token);write('sessionStorage','homm3.session',token);
+      write('localStorage','homm3.nickname',nickname);renderIdentity();
+    },
     captureReport(){
       if(!room?.serverAuthority || !window.homm3Authority?.active)return null;
       if(pendingReport)return pendingReport.promise;

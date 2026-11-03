@@ -1,0 +1,110 @@
+#cloud-dialog {
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 20px;
+  color: var(--text);
+  background: var(--panel) var(--h3-leather);
+  border: 3px solid var(--player-light, var(--gold));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+#cloud-dialog::backdrop {
+  background: #000a;
+}
+#cloud-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+#cloud-dialog h2 {
+  font-size: 30px;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+#cloud-dialog p {
+  font-size: 15px;
+  line-height: 1.45;
+  margin: 12px 0;
+  text-wrap: pretty;
+}
+#cloud-dialog button {
+  font-size: 22px;
+  min-height: 40px;
+  transition: scale 0.12s ease;
+}
+#cloud-dialog button:active {
+  scale: 0.96;
+}
+#cloud-close {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font:
+    24px/1 Georgia,
+    serif !important;
+}
+#cloud-status {
+  padding: 10px;
+  background: var(--well);
+  border: 1px solid var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+#cloud-dialog summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+}
+#cloud-dialog input {
+  min-width: 0;
+  width: 100%;
+  margin: 6px 0;
+}
+#cloud-dialog label {
+  display: block;
+  font-size: 16px;
+}
+#cloud-dialog form {
+  margin: 12px 0;
+}
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+#cloud-dialog table {
+  width: 100%;
+}
+#cloud-list td {
+  padding: 8px;
+  overflow-wrap: anywhere;
+}
+#cloud-list small {
+  font-size: 13px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+#cloud-open {
+  font-size: 22px;
+  min-height: 40px;
+  margin-top: 6px;
+}
+#view-cloud {
+  width: 100%;
+}
+@media (max-height: 480px) {
+  #cloud-dialog {
+    padding: 12px;
+    max-height: calc(100dvh - 12px);
+  }
+  #cloud-dialog h2 {
+    font-size: 26px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #cloud-dialog button {
+    transition: none;
+  }
+}

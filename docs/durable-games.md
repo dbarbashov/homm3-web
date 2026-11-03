@@ -50,3 +50,9 @@ are not automatically deleted by an idle-room cleanup.
 
 These features apply to server-hosted games. Legacy peer games retain their
 existing behavior.
+
+## Single-player saves
+
+Optional [cloud save synchronization](solo-cloud-saves.md) transfers ordinary
+local saves and autosaves between linked devices, with an offline upload queue.
+It is separate from the server-hosted match history described above.
