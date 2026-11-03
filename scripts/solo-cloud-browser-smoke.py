@@ -2,7 +2,7 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 from browser_audio import use_silent_audio
-import base64, hashlib, json, os, socket, subprocess, tempfile, time, urllib.request, urllib.error
+import base64, hashlib, json, os, socket, subprocess, tempfile, time, urllib.request, urllib.error, uuid
 ROOT=Path(__file__).resolve().parents[1]
 LOBBY=Path(os.environ.get('LOBBY_ROOT', ROOT.parent/'homm3-lobby'))
 OUT=ROOT/'test-results/solo-cloud';OUT.mkdir(parents=True,exist_ok=True)
@@ -95,6 +95,15 @@ with tempfile.TemporaryDirectory(prefix='solo-cloud-',dir=ROOT/'.local') as temp
    p.route('**/lobby/solo/saves',drop_ack);write_save(p,'ack-lost');p.evaluate('homm3Cloud.sync()')
    p.wait_for_timeout(500);assert lost[0];p.unroute('**/lobby/solo/saves');sync(p)
    record('lost upload acknowledgement retries idempotently without losing queue')
+   # An asynchronous checksum must not authorize overwriting bytes changed meanwhile.
+   race={'slot':uuid.uuid4().hex,'revision':uuid.uuid4().hex,'parent':None,'name':'Race.GM1','engine':initial[0]['engine'],'hash':hashlib.sha256(b'race-base').hexdigest(),'data':base64.b64encode(b'race-base').decode()}
+   baseline=api(base,'saves',identity['token'],race)
+   p.evaluate('''async ({row,owner})=>{Module.FS.writeFile('/runtime/games/Race.GM1',new TextEncoder().encode('race-base'));const db=await import('/site/solo-store.js');await db.track({...row,owner,key:owner+':Race.GM1'});await homm3PersistFiles();}''',{'row':baseline,'owner':identity['owner']})
+   race.update(parent=race['revision'],revision=uuid.uuid4().hex,hash=hashlib.sha256(b'race-remote').hexdigest(),data=base64.b64encode(b'race-remote').decode());api(base,'saves',identity['token'],race)
+   p.evaluate('''()=>{window.originalDigest=crypto.subtle.digest;window.raceFired=false;crypto.subtle.digest=function(algorithm,data){const task=originalDigest.call(this,algorithm,data);if(new TextDecoder().decode(data)==='race-base'){raceFired=true;Module.FS.writeFile('/runtime/games/Race.GM1',new TextEncoder().encode('race-local'));}return task;};}''')
+   sync(p)
+   assert p.evaluate("raceFired && new TextDecoder().decode(Module.FS.readFile('/runtime/games/Race.GM1'))==='race-local'")
+   p.evaluate('()=>{crypto.subtle.digest=originalDigest;}');record('native write during asynchronous checksum is preserved; remote copy gets another filename')
    # Both clients now share one baseline, then continue independently offline.
    root=next(h for h in api(base,'saves',identity['token'])['heads'] if h['name']=='CloudQueue.GM1')
    async_js='''async ({owner,base,value})=>{const db=await import('/site/solo-store.js');const row=await db.capture(owner,base.name,new TextEncoder().encode(value).buffer,base.engine,base);return row.revision;}'''

@@ -148,15 +148,20 @@ window.homm3SoloSnapshot = (path) => (settings.enabled ? snapshot(path) : []);
 window.addEventListener("homm3-save-persisted", (event) => {
   if (event.detail?.solo) queueCapture(event.detail.solo);
 });
+function canInstall() {
+  return (
+    settings.enabled &&
+    mounted &&
+    solo() &&
+    (!window.homm3Boot?.running ||
+      ["main", "new"].includes(window.homm3PortDiagnostics?.screen))
+  );
+}
+function equalBytes(a, b) {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
 async function installCopies() {
-  if (
-    !settings.enabled ||
-    !mounted ||
-    !solo() ||
-    (window.homm3Boot?.running &&
-      !["main", "new"].includes(window.homm3PortDiagnostics?.screen))
-  )
-    return;
+  if (!canInstall()) return;
   const version = await engine();
   let files = await db.rows("files"),
     changed = false;
@@ -166,77 +171,74 @@ async function installCopies() {
       c.engine === version &&
       settings.heads?.some((h) => h.revision === c.revision),
   );
-  for (const row of copies) {
-    const installed = files.find(
-      (f) => f.owner === row.owner && f.revision === row.revision,
-    );
-    if (
-      installed &&
-      Module.FS.analyzePath("/runtime/games/" + installed.name).exists &&
-      (await db.hash(
-        Module.FS.readFile("/runtime/games/" + installed.name),
-      )) === row.hash
-    )
-      continue;
-    const parents = files.filter(
-      (f) => f.owner === row.owner && f.slot === row.slot,
-    );
-    let previous = parents.find((f) => f.revision === row.parent),
-      name = previous?.name || row.name,
-      path = "/runtime/games/" + name;
-    if (Module.FS.analyzePath(path).exists) {
-      const actual = await db.hash(Module.FS.readFile(path));
-      if (actual === row.hash) {
-        const item = {
-          ...row,
-          key: row.owner + ":" + name,
-          name,
-          data: undefined,
-        };
-        await db.track(item);
-        files.push(item);
-        bases.set(name, item);
-        continue;
-      }
-      if (!previous || actual !== previous.hash) {
-        name =
-          "Cloud_" +
-          row.slot.slice(0, 8) +
-          "_" +
-          row.revision.slice(0, 8) +
-          row.name.slice(-4);
-        path = "/runtime/games/" + name;
-      }
-    }
-    // Verify again immediately before writing; JS may have yielded to a native save.
-    if (
-      Module.FS.analyzePath(path).exists &&
-      (!previous || (await db.hash(Module.FS.readFile(path))) !== previous.hash)
-    ) {
-      name =
-        "Cloud_" +
-        row.slot.slice(0, 8) +
-        "_" +
-        row.revision.slice(0, 8) +
-        row.name.slice(-4);
-      path = "/runtime/games/" + name;
+  try {
+    for (const row of copies) {
+      const installed = files.find(
+        (f) => f.owner === row.owner && f.revision === row.revision,
+      );
       if (
-        Module.FS.analyzePath(path).exists &&
-        (await db.hash(Module.FS.readFile(path))) !== row.hash
-      ) {
-        name = "Cloud_" + db.id().slice(0, 12) + row.name.slice(-4);
-        path = "/runtime/games/" + name;
+        installed &&
+        Module.FS.analyzePath("/runtime/games/" + installed.name).exists &&
+        (await db.hash(
+          Module.FS.readFile("/runtime/games/" + installed.name),
+        )) === row.hash
+      )
+        continue;
+      const previous = files.find(
+        (f) =>
+          f.owner === row.owner &&
+          f.slot === row.slot &&
+          f.revision === row.parent,
+      );
+      let name = previous?.name || row.name,
+        path = "/runtime/games/" + name,
+        identical = false;
+      if (Module.FS.analyzePath(path).exists) {
+        const before = Module.FS.readFile(path),
+          digest = await db.hash(before);
+        if (!canInstall()) break;
+        // Digesting yields to native game events. Recheck bytes synchronously:
+        // no await is allowed between this guard and the filesystem write.
+        const unchanged =
+          Module.FS.analyzePath(path).exists &&
+          equalBytes(before, Module.FS.readFile(path));
+        identical = unchanged && digest === row.hash;
+        if (
+          !unchanged ||
+          (!identical && (!previous || digest !== previous.hash))
+        ) {
+          name =
+            "Cloud_" +
+            row.slot.slice(0, 8) +
+            "_" +
+            row.revision.slice(0, 8) +
+            row.name.slice(-4);
+          path = "/runtime/games/" + name;
+          while (Module.FS.analyzePath(path).exists) {
+            name = "Cloud_" + db.id().slice(0, 12) + row.name.slice(-4);
+            path = "/runtime/games/" + name;
+          }
+        }
       }
+      if (!canInstall()) break;
+      if (!identical) {
+        Module.FS.writeFile(path, new Uint8Array(row.data));
+        changed = true;
+      }
+      const item = {
+        ...row,
+        key: row.owner + ":" + name,
+        name,
+        data: undefined,
+      };
+      await db.track(item);
+      files = files.filter((f) => f.key !== item.key);
+      files.push(item);
+      bases.set(name, item);
     }
-    Module.FS.writeFile(path, new Uint8Array(row.data));
-    changed = true;
-    const item = { ...row, key: row.owner + ":" + name, name, data: undefined };
-    await db.track(item);
-    files = files.filter((f) => f.key !== item.key);
-    files.push(item);
-    bases.set(name, item);
+  } finally {
+    if (changed) await window.homm3PersistFiles();
   }
-  if (changed) await window.homm3PersistFiles();
 }
 window.homm3SoloMounted = async () => {
   mounted = true;
