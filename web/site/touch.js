@@ -1,7 +1,8 @@
 /* Touch-to-mouse boundary for the original SDL client. No game rules here. */
 (() => {
   window.Homm3Touch = class {
-    constructor(canvas, ring) {
+    constructor(canvas, ring, options = {}) {
+      this.options = options;
       this.canvas = canvas;
       this.ring = ring;
       this.points = new Map();
@@ -70,8 +71,11 @@
       } else {
         this.clearHold(); this.lastTap=null;
         this.release(this.gesture?.point || this.point(e));
-        this.gesture={kind:'cancelled'};
+        this.gesture=this.options.canPan?.() ? {kind:'pan',center:this.center()} : {kind:'cancelled'};
       }
+    }
+    center() {
+      const points=[...this.points.values()];return {x:points.reduce((s,p)=>s+p.x,0)/points.length,y:points.reduce((s,p)=>s+p.y,0)/points.length};
     }
     move(e) {
       if (!this.points.has(e.pointerId)) return;
@@ -79,6 +83,7 @@
       const g=this.gesture;
       if (!g) return;
       if (g.kind==='cancelled') return;
+      if(g.kind==='pan'){const center=this.center();this.options.pan?.(center.x-g.center.x,center.y-g.center.y);g.center=center;return;}
       g.point=this.point(e);
       if (g.kind==='pending' && Math.hypot(e.clientX-g.start.x,e.clientY-g.start.y)>10) {
         this.clearHold(); this.lastTap=null; g.kind='drag';
@@ -106,7 +111,7 @@
           this.idlePointer();
         }, 30);
         this.lastTap=double?null:{...point,time:now};
-      } else if (g && g.kind!=='cancelled') {
+      } else if (g && !['cancelled','pan'].includes(g.kind)) {
         this.release(g.kind==='right'?g.start:g.point);
       }
       if (cancelled) this.lastTap=null;

@@ -3,12 +3,17 @@
 Open **Single player → Cloud saves → Enable synchronization** once. Normal saves
 and autosaves are written locally first, then uploaded automatically. This is
 optional: single-player continues to run locally, including without a connection.
-Game installation files are not uploaded.
+Game installation files are not uploaded. Existing local saves can upload before
+you start the game; there is no need to create a new party first. An empty cloud
+library is reported explicitly.
 
 ## Continue on another device
 
 1. In **Cloud saves → Continue on another device**, generate a one-use code.
 2. Open Cloud saves on the second device and enter that code within ten minutes.
+   You can do this before launch or from the original game’s main menu. The
+   result appears next to the code field. A running adventure/battle is protected;
+   return to the game’s main menu before changing its library.
 3. Prepare your game resources there, start the game and use its normal **Load
    game** menu. Downloaded saves appear there automatically.
 

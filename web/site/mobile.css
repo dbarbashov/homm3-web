@@ -11,4 +11,9 @@ html:has(.game-immersive),body.game-immersive{position:fixed;inset:0;overflow:hi
 @media(max-height:480px){#tavern{border-width:8px;border-image-width:8px;padding:5px max(6px,calc((100% - 850px)/2));gap:4px}#tavern .tavern-heading h2{font-size:28px}#tavern .rooms-panel{gap:4px}#tavern .room-scroll{min-height:86px}#tavern .network-form{gap:6px}#tavern .network-form .notice{font-size:13px}#tavern #room-info{gap:5px}#launch-cover{justify-content:flex-start;gap:10px}.launch-crest{width:72px}#view-actions{padding:5px;width:260px}#view-actions h2{font-size:26px}}
 #network-title:focus{outline:none}
 
-#view-actions .menu-options{display:grid;grid-template-columns:1fr 1fr;gap:4px}#view-actions .menu-options:has(#view-offline[hidden]){grid-template-columns:1fr}
+#view-actions .menu-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}#view-actions .menu-options:has(#view-offline[hidden]){grid-template-columns:repeat(2,minmax(0,1fr))}
+
+.scale-setting{padding:6px 0;border-bottom:1px solid var(--gold)}.scale-setting label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:17px}.scale-setting output{font-variant-numeric:tabular-nums}.scale-controls{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;margin:6px 0}#view-actions .scale-controls button{min-height:44px;font:24px/1 Georgia,serif}#game-scale{width:100%;min-width:0;min-height:44px;margin:0;padding:0;accent-color:#d6b679}#scale-help{font-size:13px;line-height:1.4;margin:7px 0 3px;color:var(--dim)}
+
+#view-actions .menu-options>button{font-size:20px;line-height:1;min-height:40px;padding:2px 3px}
+@media(max-height:480px){#view-actions h2{margin-bottom:0}}

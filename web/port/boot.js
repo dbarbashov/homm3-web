@@ -69,16 +69,10 @@ window.Module = {
     } catch (error) { status.textContent = error.message; start.textContent = 'Архивы недоступны'; }
   }
 };
-async function prepare() {
-  if (prepared) return;
-  if (preparing) return preparing;
-  preparing = (async () => {
-    if (!runtimeReady) throw new Error('Движок ещё загружается');
-    window.homm3Music?.unlock();
-    await refreshCatalog();
-    start.disabled = true; start.textContent = 'Загрузка архивов…'; progress.hidden = false;
-    const fingerprints = [];
-    const { digest } = await import('/port/sha256.js');
+let filesReady;
+async function prepareFiles() {
+  if (!runtimeReady) throw new Error('Движок ещё загружается');
+  return filesReady ||= (async () => {
     const dataDir = fullGame ? '/runtime/data' : '/data';
     filesystemCreated = true;
     if (fullGame) {
@@ -93,6 +87,22 @@ async function prepare() {
     if (fullGame) {
       Module.FS.mount(Module.IDBFS, {}, '/runtime/games');
       await new Promise((resolve, reject) => Module.FS.syncfs(true, error => error ? reject(error) : resolve()));
+    }
+  })();
+}
+async function prepare() {
+  if (prepared) return;
+  if (preparing) return preparing;
+  preparing = (async () => {
+    if (!runtimeReady) throw new Error('Движок ещё загружается');
+    window.homm3Music?.unlock();
+    await refreshCatalog();
+    start.disabled = true; start.textContent = 'Загрузка архивов…'; progress.hidden = false;
+    const fingerprints = [];
+    const { digest } = await import('/port/sha256.js');
+    const dataDir = fullGame ? '/runtime/data' : '/data';
+    await prepareFiles();
+    if (fullGame) {
       try { await import('/site/solo-cloud.js'); await window.homm3SoloMounted?.(); }
       catch (error) { console.warn('Cloud saves unavailable:', error.message); }
     }
@@ -150,7 +160,7 @@ async function refreshAssets() {
   await refreshCatalog();
 }
 window.addEventListener('focus', () => { if (!catalog?.ready) refreshAssets().catch(()=>{}); });
-window.homm3Boot = { prepare, refreshAssets, run: runGame, fail: failEngine, get running() { return running; }, get ready() { return runtimeReady; } };
+window.homm3Boot = { prepare, prepareFiles, refreshAssets, run: runGame, fail: failEngine, get running() { return running; }, get ready() { return runtimeReady; } };
 start.addEventListener('click', async () => {
   if (exited) { location.reload(); return; }
   try { await prepare(); runGame(); } catch(error) { status.textContent = error.message; start.textContent = 'Перезагрузите страницу для повтора'; }

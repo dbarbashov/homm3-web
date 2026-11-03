@@ -59,19 +59,28 @@ with tempfile.TemporaryDirectory(prefix='solo-cloud-',dir=ROOT/'.local') as temp
     content=api(base,'saves/'+h['revision'],identity['token']);assert hashlib.sha256(content).hexdigest()==h['hash']
    record('native manual save uploaded, checksums and empty durable queue')
    grant=api(base,'device/code',identity['token'],method='POST')
-   q.goto(base+'/port/game.html?hd=0');q.wait_for_function('!!window.homm3Cloud');q.locator('#cloud-open').click()
-   q.locator('#cloud-dialog summary').first.click();q.locator('#cloud-input').fill(grant['code']);q.locator('#cloud-claim button').click()
+   q.goto(base+'/');q.get_by_role('link',name='Одиночная игра',exact=True).click();screen(q,'main');q.locator('#view-toggle').click();q.locator('#view-cloud').click()
+   q.locator('#cloud-dialog summary').first.click();q.locator('#cloud-input').fill('0'*32);q.locator('#cloud-claim button').click()
+   q.wait_for_function('document.querySelector("#cloud-transfer-status").textContent.includes("недействителен")')
+   q.locator('#cloud-input').fill(grant['code']);q.locator('#cloud-claim button').click()
    q.wait_for_function('(owner)=>document.querySelector("#cloud-count").textContent.includes("В облаке")',arg=identity['owner'],timeout=30000)
    other=config(q);assert other['owner']==identity['owner'] and other['token']!=identity['token']
    q.screenshot(path=str(OUT/(ENGINE+'-library.png')))
    for w,h in [(852,393),(393,852)]:
     q.set_viewport_size({'width':w,'height':h});assert q.evaluate('document.documentElement.scrollWidth<=innerWidth');q.screenshot(path=str(OUT/(ENGINE+f'-library-{w}.png')))
-   q.set_viewport_size({'width':1100,'height':900});q.locator('#cloud-close').click();q.locator('#start').click();screen(q,'main')
+   q.set_viewport_size({'width':1100,'height':900});q.locator('#cloud-close').click();q.locator('#view-resume').click();screen(q,'main')
    downloaded=q.evaluate('Module.FS.readdir("/runtime/games")');assert any(n.lower().endswith('.gm1') for n in downloaded)
    qc=q.locator('#canvas');qc.press('l');screen(q,'load');qc.press('s');screen(q,'scenarios');qc.press('l');screen(q,'adventure')
    loaded=q.evaluate('homm3GameState')
    for key in ['day','hero','x','y','z','movement','gold']:assert loaded[key]==state[key],(key,loaded,state)
-   record('second device claims code, mounts real cloud save and loads identical game state; mobile layout')
+   record('homepage autostart main menu accepts device code, visible invalid-code feedback, native restore and mobile layout')
+   # Existing IDBFS saves must upload before the user starts a new game.
+   old_context=browser.new_context();use_silent_audio(old_context);old=old_context.new_page();old.goto(base+'/port/game.html?hd=0');old.wait_for_function('window.homm3Boot?.ready')
+   sample=p.evaluate('Array.from(Module.FS.readFile("/runtime/games/"+Module.FS.readdir("/runtime/games").find(n=>/\\.gm1$/i.test(n))))')
+   old.evaluate('''async data=>{await homm3Boot.prepareFiles();Module.FS.writeFile('/runtime/games/Existing.GM1',new Uint8Array(data));await homm3PersistFiles();}''',sample)
+   old.reload();old.wait_for_function('!!window.homm3Cloud');old.locator('#cloud-open').click();old.locator('#cloud-enable').click();sync(old)
+   assert not old.evaluate('homm3Boot.running') and any(h['name']=='Existing.GM1' for h in api(base,'saves',config(old)['token'])['heads'])
+   old_context.close();record('existing native IDBFS save uploads before game start')
    a.set_offline(True)
    # Native file write + the production native-save event: isolate queue transport from map randomness.
    def write_save(page,marker):

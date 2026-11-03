@@ -1,6 +1,8 @@
 /* The game always fills its viewport; tavern content scrolls independently. */
 (() => {
   const $=id=>document.getElementById(id), canvas=$('canvas'), stage=$('game-stage');
+  let zoom=1,panX=0,panY=0,touch;
+  try { const stored=Number(localStorage.getItem('homm3.viewZoom'));if(Number.isFinite(stored) && stored>=100 && stored<=200)zoom=stored/100; } catch {}
   function render() {
     const rect=stage.getBoundingClientRect(), ratio=rect.width/Math.max(1,rect.height);
     const classic=new URLSearchParams(location.search).get('hd')==='0';
@@ -9,8 +11,14 @@
       : {width:800,height:Math.min(2048,Math.round(800/ratio))};
     canvas.style.width=canvas.width+'px';canvas.style.height=canvas.height+'px';
     const fit=Math.min(rect.width/canvas.width,rect.height/canvas.height);
-    canvas.style.transform=`translate(-50%,-50%) scale(${fit})`;
-    window.homm3Viewport={immersive:true,fit,width:rect.width,height:rect.height};
+    const scale=fit*zoom,maxX=Math.max(0,(canvas.width*scale-rect.width)/2),maxY=Math.max(0,(canvas.height*scale-rect.height)/2);
+    panX=Math.min(maxX,Math.max(-maxX,panX));panY=Math.min(maxY,Math.max(-maxY,panY));
+    canvas.style.left=`calc(50% + ${panX}px)`;canvas.style.top=`calc(50% + ${panY}px)`;
+    canvas.style.transform=`translate(-50%,-50%) scale(${scale})`;
+    window.homm3Viewport={immersive:true,fit,scale,zoom,panX,panY,maxX,maxY,width:rect.width,height:rect.height};
+    $('game-scale').value=String(Math.round(zoom*100));$('game-scale-value').value=Math.round(zoom*100)+'%';
+    $('scale-less').disabled=zoom<=1;$('scale-more').disabled=zoom>=2;
+    $('scale-help').hidden=zoom===1;
   }
   function resize() {
     const vv=window.visualViewport;
@@ -65,7 +73,24 @@
     setSmoothCamera(!window.homm3SmoothCamera);
     try { localStorage.setItem('homm3.smoothCamera',String(window.homm3SmoothCamera)); } catch {}
   };
-  const touch=new window.Homm3Touch(canvas,$('touch-hold-ring'));
+  function setZoom(percent) {
+    const value=Number(percent);if(!Number.isFinite(value))return;
+    touch?.cancel();const next=Math.min(2,Math.max(1,value/100));panX*=next/zoom;panY*=next/zoom;zoom=next;
+    try{localStorage.setItem('homm3.viewZoom',String(Math.round(zoom*100)));}catch{}
+    render();
+  }
+  function panBy(dx,dy){if(zoom<=1)return;panX+=dx;panY+=dy;render();}
+  touch=new window.Homm3Touch(canvas,$('touch-hold-ring'),{canPan:()=>zoom>1,pan:panBy});
+  $('game-scale').oninput=e=>setZoom(e.target.value);
+  $('scale-less').onclick=()=>setZoom(Math.round(zoom*100)-25);
+  $('scale-more').onclick=()=>setZoom(Math.round(zoom*100)+25);
+  $('scale-reset').onclick=()=>{panX=panY=0;setZoom(100);};
+  canvas.addEventListener('wheel',e=>{
+    if(zoom<=1 || e.ctrlKey || e.metaKey)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    panBy(e.shiftKey && !e.deltaX?-e.deltaY:-e.deltaX,e.shiftKey?0:-e.deltaY);
+  },{capture:true,passive:false});
+  window.homm3View={setZoom,panBy};
   $('fullscreen').onclick=async()=>{
     closeControls();
     try {

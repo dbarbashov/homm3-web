@@ -8,8 +8,12 @@ let settings = await db.config(),
   retry = 2000,
   problem = "",
   currentEngine;
-let captureQueue = Promise.resolve();
+let captureQueue = Promise.resolve(),
+  syncTask,
+  mounting,
+  claiming = false;
 const bases = new Map();
+let filesInitialized;
 const solo = () =>
   !window.homm3Room &&
   !window.homm3Authority?.active &&
@@ -154,7 +158,7 @@ function canInstall() {
     mounted &&
     solo() &&
     (!window.homm3Boot?.running ||
-      ["main", "new"].includes(window.homm3PortDiagnostics?.screen))
+      ["main", "new", "load"].includes(window.homm3PortDiagnostics?.screen))
   );
 }
 function equalBytes(a, b) {
@@ -240,7 +244,8 @@ async function installCopies() {
     if (changed) await window.homm3PersistFiles();
   }
 }
-window.homm3SoloMounted = async () => {
+window.homm3SoloMounted = () => (filesInitialized ||= initializeFiles());
+async function initializeFiles() {
   mounted = true;
   try {
     settings = await db.config();
@@ -269,13 +274,68 @@ window.homm3SoloMounted = async () => {
   } catch (e) {
     message(e.message);
   }
-};
-async function sync() {
-  if (syncing) return;
+}
+async function ensureMounted() {
+  if (!solo()) return;
+  if (mounted) {
+    await filesInitialized;
+    return;
+  }
+  if (mounting) return mounting;
+  mounting = (async () => {
+    if (!window.homm3Boot?.ready)
+      await new Promise((resolve, reject) => {
+        const done = () => {
+          clearTimeout(timer);
+          window.removeEventListener("homm3-boot-ready", done);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          window.removeEventListener("homm3-boot-ready", done);
+          reject(
+            Error(
+              "Движок ещё загружается. Повторите синхронизацию через несколько секунд.",
+            ),
+          );
+        }, 20000);
+        window.addEventListener("homm3-boot-ready", done);
+      });
+    await window.homm3Boot.prepareFiles();
+    await window.homm3SoloMounted();
+  })();
+  try {
+    await mounting;
+  } finally {
+    mounting = null;
+  }
+}
+function transferMessage(text) {
+  $("cloud-transfer-status").textContent = text;
+}
+function canClaim() {
+  return (
+    solo() &&
+    (!window.homm3Boot?.running ||
+      ["main", "new", "load"].includes(window.homm3PortDiagnostics?.screen))
+  );
+}
+function sync() {
+  if (!syncTask)
+    syncTask = runSync().finally(() => {
+      syncTask = null;
+    });
+  return syncTask;
+}
+async function runSync() {
   syncing = true;
   problem = "";
-  await render();
   try {
+    await render();
+    settings = await db.config();
+    if (settings.enabled) {
+      await ensureMounted();
+      await captureQueue;
+    }
     await lock(async () => {
       settings = await db.config();
       if (!settings.enabled) return;
@@ -361,13 +421,15 @@ async function render() {
         ? "Сейвы сохраняются только на этом устройстве."
         : queued.length
           ? `Сохранено здесь. Ожидают отправки: ${queued.length}.`
-          : settings.lastSync
-            ? "Сохранено в облаке · " +
-              new Date(settings.lastSync).toLocaleTimeString("ru", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "Новые сейвы будут отправляться автоматически.");
+          : settings.lastSync && !heads.length
+            ? "В облаке пока нет сейвов. Сохраните партию на исходном устройстве."
+            : settings.lastSync
+              ? "Сохранено в облаке · " +
+                new Date(settings.lastSync).toLocaleTimeString("ru", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Новые сейвы будут отправляться автоматически.");
   $("cloud-sync").disabled = syncing;
   const installedFiles = mounted ? await db.rows("files") : [];
   const list = $("cloud-list");
@@ -414,6 +476,7 @@ $("cloud-enable").onclick = async () => {
   try {
     settings = { ...(await db.config()), enabled: true };
     await db.configure(settings);
+    await ensureMounted();
     await queueCapture(snapshot(), true);
     schedule(0);
     await render();
@@ -430,12 +493,17 @@ $("cloud-disable").onclick = async () => {
 $("cloud-sync").onclick = () => sync();
 $("cloud-code-create").onclick = async () => {
   try {
+    await ensureMounted();
+    await captureQueue;
     await sync();
     if (problem) throw Error(problem);
     const v = await (await request("device/code", "POST")).json();
     $("cloud-code").value = v.code.match(/.{1,8}/g).join("-");
     $("cloud-issued").hidden = false;
     $("cloud-code-status").textContent =
+      (settings.heads?.length
+        ? `В облаке сейвов: ${settings.heads.length}. `
+        : "В облаке пока нет сейвов. Сохраните партию на этом устройстве. ") +
       "Код действует 10 минут и используется один раз.";
   } catch (e) {
     message(e.message);
@@ -451,15 +519,25 @@ $("cloud-copy").onclick = async () => {
 };
 $("cloud-claim").onsubmit = async (event) => {
   event.preventDefault();
-  if (window.homm3Boot?.running || window.homm3Room) {
-    message("Завершите текущую игру перед переносом доступа.");
+  if (claiming) return;
+  if (!canClaim()) {
+    transferMessage(
+      "Чтобы получить сейвы, вернитесь в главное меню самой игры. Текущая партия не будет заменена.",
+    );
     return;
   }
+  claiming = true;
+  const button = $("cloud-claim").querySelector("button");
+  button.disabled = true;
+  transferMessage("Проверяем код и загружаем сейвы…");
   try {
     const code = $("cloud-input").value.replace(/[\s-]/g, "").toLowerCase();
     if (!/^[a-f0-9]{32}$/.test(code))
       throw Error("Введите весь одноразовый код.");
+    await syncTask;
     await lock(async () => {
+      if (!canClaim())
+        throw Error("Вернитесь в главное меню игры и повторите ввод кода.");
       const v = await (
         await request("device/claim", "POST", { code }, "")
       ).json();
@@ -476,11 +554,30 @@ $("cloud-claim").onsubmit = async (event) => {
       await db.enroll(settings, false);
       bases.clear();
       adopt(v);
+      // A mounted game menu must establish the receiving device's baseline too.
+      if (mounted) {
+        const excludedFiles = {};
+        for (const f of snapshot())
+          excludedFiles[f.name] = await db.hash(f.data);
+        settings = { ...settings, excludedFiles };
+        await db.configure(settings);
+      }
     });
     $("cloud-input").value = "";
+    await syncTask;
     await sync();
+    if (problem)
+      throw Error("Доступ подключён, но загрузка ещё не завершена: " + problem);
+    transferMessage(
+      settings.heads?.length
+        ? `Получено сейвов: ${settings.heads.length}. Закройте это окно и выберите «Загрузить игру».`
+        : "Доступ подключён. В этой библиотеке пока нет сейвов. На исходном устройстве сохраните партию и дождитесь её отправки в облако.",
+    );
   } catch (e) {
-    message(e.message);
+    transferMessage(e.message);
+  } finally {
+    claiming = false;
+    button.disabled = false;
   }
 };
 $("cloud-revoke").onclick = async () => {

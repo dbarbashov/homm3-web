@@ -27,7 +27,25 @@ with sync_playwright() as p:
   cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y,'id':1}]});page.wait_for_timeout(700)
   cdp.send('Input.dispatchTouchEvent',{'type':'touchCancel','touchPoints':[]});page.wait_for_timeout(250)
   assert page.evaluate('testMouse')==[['mousedown',2],['mouseup',2]]
- canvas.press('n');page.wait_for_function('window.homm3PortDiagnostics.screen==="new"');canvas.press('s');page.wait_for_function('window.homm3PortDiagnostics.screen==="scenarios"');canvas.press('b');page.wait_for_timeout(3000);canvas.press('Enter');page.wait_for_function('window.homm3PortDiagnostics.screen==="adventure"',timeout=60000)
+ # Zoom is a viewport preference, not a change to the native game dimensions.
+ page.locator('#view-toggle').tap();page.locator('#view-settings').tap();before=canvas.bounding_box();native_size=page.evaluate('[canvas.width,canvas.height]')
+ page.locator('#scale-more').tap();page.locator('#scale-more').tap();assert page.locator('#game-scale-value').text_content()=='150%'
+ enlarged=canvas.bounding_box();assert abs(enlarged['width']/before['width']-1.5)<.01;assert page.evaluate('[canvas.width,canvas.height]')==native_size
+ page.locator('#settings-back').tap();page.locator('#view-resume').tap()
+ if engine=='chromium':
+  page.evaluate('testMouse=[]');before_pan=canvas.bounding_box()
+  cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':250,'y':200,'id':1},{'x':380,'y':200,'id':2}]})
+  cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':210,'y':230,'id':1},{'x':340,'y':230,'id':2}]});page.wait_for_timeout(100)
+  cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});assert canvas.bounding_box()['y']>before_pan['y'];assert page.evaluate('testMouse')==[]
+ page.set_viewport_size({'width':852,'height':393});page.wait_for_timeout(250);page.screenshot(path=str(OUT/(engine+'-zoom-150-landscape.png')))
+ page.reload();page.wait_for_function('window.homm3PortDiagnostics?.screen==="main"',timeout=120000);assert page.evaluate('homm3Viewport.zoom')==1.5
+ # The enlarged canvas can still hit original buttons at the right edge.
+ page.evaluate('homm3View.setZoom(200);homm3View.panBy(-99999,99999)');page.wait_for_timeout(100)
+ box=canvas.bounding_box();page.touchscreen.tap(box['x']+650*box['width']/800,box['y']+70*box['height']/600)
+ page.wait_for_function('window.homm3PortDiagnostics.screen==="new"')
+ page.locator('#view-toggle').tap();page.locator('#view-settings').tap();page.locator('#scale-reset').tap();assert page.evaluate('homm3Viewport.zoom===1 && homm3Viewport.panX===0 && homm3Viewport.panY===0')
+ page.locator('#settings-back').tap();page.locator('#view-resume').tap()
+ page.wait_for_function('window.homm3PortDiagnostics.screen==="new"');canvas.press('s');page.wait_for_function('window.homm3PortDiagnostics.screen==="scenarios"');canvas.press('b');page.wait_for_timeout(3000);canvas.press('Enter');page.wait_for_function('window.homm3PortDiagnostics.screen==="adventure"',timeout=60000)
  initial=page.evaluate('window.homm3GameState.y');canvas.press('ArrowDown');page.wait_for_function('(y)=>window.homm3GameState.y===y+1',arg=initial)
  for width,height in [(734,343),(393,659),(1440,900)]:
   page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(500)
@@ -41,5 +59,5 @@ with sync_playwright() as p:
   page.locator('#view-settings').tap();page.locator('#smooth-camera').tap();assert page.locator('#smooth-camera').get_attribute('aria-pressed')=='false';page.locator('#smooth-camera').tap();page.locator('#settings-back').tap()
   page.locator('#view-exit').tap();assert page.locator('#exit-dialog').is_visible();page.locator('#exit-cancel').tap();assert page.locator('#exit-dialog').is_hidden();page.locator('#view-resume').tap();assert page.locator('#view-actions').is_hidden()
  assert not errors,errors
- (OUT/(engine+'-game-results.json')).write_text(json.dumps({'passed':True,'errors':errors,'checks':['real solo entry','old network session not restored in solo','actual hero movement','single 44px menu control','mobile and desktop menu fits','settings/back','cancel exit']},ensure_ascii=False,indent=2))
+ (OUT/(engine+'-game-results.json')).write_text(json.dumps({'passed':True,'errors':errors,'checks':['real solo entry','old network session not restored in solo','actual hero movement','single 44px menu control','mobile and desktop menu fits','settings/back','cancel exit','100–200% zoom, persistence and reset','two-finger pan without game clicks','native hit testing at zoom200']},ensure_ascii=False,indent=2))
  browser.close();print(engine,'real solo, movement, compact menu, settings, exit, 3 sizes PASS')

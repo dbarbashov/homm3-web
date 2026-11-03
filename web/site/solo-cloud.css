@@ -108,3 +108,5 @@
     transition: none;
   }
 }
+
+#cloud-transfer-status{min-height:1.45em;overflow-wrap:anywhere;color:var(--text)}
